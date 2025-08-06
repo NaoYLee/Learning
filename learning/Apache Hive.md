@@ -51,15 +51,51 @@ HQL的DDL与DML本质上是修改元数据
 
 `UNION` <type, type, ...>
 
-## 完整建表语句
+## Hive DDL
+
+### 数据库
 
 ```HQL
+-- 创建数据库
+CREATE [DATABASE|SCHEMA] [IF NOT EXISTS] <database>
+[COMMENT '<comment>']
+LOCATION '<HDFS_path>'
+[WITH DBPROPERTIES ('<property>'='<value>', ...)];
+
+-- 查看数据库结构
+DESCRIBE DATABASE [EXTENDED] <database>;
+
+-- 查看数据库建库语句
+SHOW CREATE DATABASE <database>;
+
+-- 切换数据库
+USE <database>;
+
+-- 删除数据库
+DROP DATABASE <database> [CASCADE];  -- CASCADE用于强制删除
+
+-- 修改数据库属性
+ALTER DATABASE <database> SET DBPROPERTIES ('<property>'='<value>', ...);
+ALTER DATABASE <database> SET OWNER [USER|ROLE] <account_type>;
+ALTER DATABASE <database> SET LOCATION '<HDFS_path>';
+
+-- 查询所有数据库
+SHOW DATABASES;
+
+-- 查看当前数据库
+SELECT current_database();
+```
+
+### 表
+
+```HQL
+-- 完整建表语句
 CREATE [TEMPORARY] [EXTERNAL] TABLE [IF NOT EXISTS] [<database>.]table (
     <column_1> <type_1> [COMMENT <comment_1>],
     <column_2> <type_2> [COMMENT <comment_2>],
     ...
 ) [COMMENT <comment>]
-[PARYTITION BY (<column type> [COMMENT <comment>], ...)]
+[PARYTITIONED BY (<column> <type> [COMMENT <comment>], ...)]
 [CLUSTERED BY (<column_1>, <column_2>, ...) [SORTED BY (<column>) [ASC|DESC], ...] INTO <num_buckets> BUCKETS]
 [ROW FORMAT [DELIMITED
 [FIELDS TERMINATED BY '<separator>']
@@ -68,9 +104,12 @@ CREATE [TEMPORARY] [EXTERNAL] TABLE [IF NOT EXISTS] [<database>.]table (
 [LINES TERMINATED BY '<separator>']
 |SERDE <serde>
 [WITH SERDEPROPERTIES (<property>=<value>, ...)]]]
+[STORED AS <file_format>]
+[LOCATION <HDFS_path>]
+[TBLPROPERTIES ('<property>'='<value>', ...)];
 ```
 
-### 分隔符
+#### 分隔符
 
 指定数据文件中字段间的分隔符
 >`FIELDS TERMINATED BY '<separator>'`
@@ -90,17 +129,17 @@ CREATE [TEMPORARY] [EXTERNAL] TABLE [IF NOT EXISTS] [<database>.]table (
 | :-: | :-: | :-: | :-: | :-: | :-: |
 | 0000 0001 | 1 | 01 | ^A | SOH | 头标开始 |
 
-### 内部表 MANAGED TABLE
+#### 内部表 MANAGED TABLE
 
 内部表是默认情况下创建的表，Hive拥有该表的结构和文件，完全管理该表元数据和数据的生命周期  
 当删除内部表时，**会删除表的元数据及存储在HDFS中的数据**
 
-### 外部表 EXTERNAL TABLE
+#### 外部表 EXTERNAL TABLE
 
 使用`EXTERNAL`关键字创建外部表，Hive只管理外部表的元数据
 删除外部表时，**只会删除Hive管理的元数据，不会删除数据**
 
-### 分区表 Partitioned Table
+#### 分区表 Partitioned Table
 
 Hive支持根据指定字段进行分区  
 实质是建立一个新的字段，并在HDFS中将不同分区的数据文件分别存储，当使用分区查询时只查询对应路径下的数据文件
@@ -110,12 +149,12 @@ CREATE TABLE <table> (
     <column_1> <type_1>,
     <column_2> <type_2>,
     ...
-) PARTITION BY (<partition_1> <type_1>, <partition_2> <type_2>, ...);
+) PARTITIONED BY (<partition_1> <type_1>, <partition_2> <type_2>, ...);
 ```
 
 **分区字段不能是表中存在的字段**  
 
-#### 分区静态加载
+##### 分区静态加载
 
 用户在加载数据时手动指定分区名称及对应数据文件
 
@@ -129,7 +168,7 @@ FROM <table_source>
 WHERE <column>='<value>';
 ```
 
-#### 分区动态加载
+##### 分区动态加载
 
 动态分区插入数据时，Hive会根据指定的字段内容自动指定分区名称
 
@@ -146,14 +185,14 @@ FROM <table_source>;
 
 **使用动态分区时只能使用`INSERT INTO`语法进行插入**  
 
-#### 多重分区
+##### 多重分区
 
 多重分区时，分区之间是一种递进关系，在迁移分区基础上继续分区  
 反映在HDFS中表现为分区文件夹中建立新的文件夹
 
 **向多重分区表中插入数据时，必须按先静态再动态的顺序进行**  
 
-### 分桶表 Bucketed Table
+#### 分桶表 Bucketed Table
 
 分桶表是一种用于优化查询而设计的表类型。  
 分桶时需要指定分桶字段及分桶数，桶编号相同的数据会被分到同一个桶中  
@@ -186,7 +225,7 @@ INTO <N> BUCKETS;  -- 指定分桶数
 | 动态/静态 | 支持动态分区（根据插入数据自动创建）和静态分区 | 分桶规则在建表时固定，写入数据时自动应用哈希分桶 |
 | 典型用例 | 按日期(dt)、国家(country)、类别(category)存储日志或交易数据 | 按用户ID(user_id)、商品ID(product_id)对大型表进行分桶以优化连接 |
 
-### 事务表
+#### 事务表
 
 Hive在设计之初因为工作原理而不支持事务  
 在Hive0.14版本中增加了对对事务的简单支持
@@ -210,14 +249,22 @@ CREATE TABLE <table>(
     ...
 ) CLUSTERED BY (<column>) INTO <N> BUCKETS  -- 事务表必须是分桶表
 STROED AS ORC  -- 事务表必须以ORC格式存储
-TBLPROPERTIES('transactional'='true');
+TBLPROPERTIES('transactional'='true');  -- 事务表必须设置transactional为true
 ```
 
-事务表操作:
+##### 事务表操作
 
 ```HQL
-insert into trans_student (id, name, age)
-values (1,"allen",18);
+-- 使用`INSERT INTO`插入数据
+INSERT INTO <table> (
+    <column_1>,
+    <column_2>,
+    ...
+) VALUES (
+    <value_1>,
+    <value_2>,
+    ...
+);
 
 -- 使用`CASE WHEN`将表中目标字段值修改为更新值覆写进表中
 INSERT OVERWRITE INTO <table>
@@ -237,6 +284,11 @@ SELECT
 FROM <table>
 WHERE <column_target> != <value_target>;
 
+-- 合并小文件
+INSERT OVERWRITE INTO <table>
+SELECT *
+FROM <table>;
+
 -- 复制表
 CREATE TABLE <table_target> AS
 SELECT *
@@ -245,13 +297,38 @@ FROM <table_source>;
 -- 复制表结构
 CREATE TABLE <table_target>  LIKE
 SELECT *
-FROM <table_source>
+FROM <table_source>;
 ```
 
-#### Hive事务表的局限性
+##### 事务表的局限性
 
 - 仅支持ORC文件格式(STORED AS ORC)
 - 表必须是分桶表（Bucketed）才可以使用事务功能
-- 不支持BEGIN，COMMIT和ROLLBACK，所有语言操作都是自动提交的
-- 外部表不能成为ACID表，不允许从非ACID会话读取/写入ACID表
+- 不支持ROLLBACK，所有语言操作都是自动提交的
+- 只有内部表可以设定为事务表
 - 所有操作都是通过向HDFS中写入文件进行的
+
+### 视图
+
+Hive中的视图只保存DQL语句，不实际存储数据,无法提高查询性能  
+创建视图时将固定视图架构，如果基础表被更改或删除将导致视图失效  
+无法向视图中插入数据
+
+```HQL
+-- 创建视图
+CREATE VIEW <view> AS
+SELECT
+    <column_1>,
+    <column_2>,
+    ...
+FROM [<table>|<view>]
+[WHERE <experssion>]
+[LIMIT <N_START>,<NUM_ROW>];
+
+-- 使用视图
+SELECT
+    <column_1>,
+    <column_2>,
+    ...
+FROM <view>;
+```
