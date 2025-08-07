@@ -211,7 +211,7 @@ ALTER TABLE <table> CHANGE <column> [<column>|<new_column>] [<type>|<new_type>] 
 
 -- 添加/替换列
   -- ADD可以将新列添加到现有列的末尾但在分区列之
-  -- REPLACE将删除所有现有列，并添加新的列
+  -- REPLACE将删除所有现有列,并添加新的列
 ALTER TABLE <table> [ADD|REPLACE] COLUMNS (<column> <type>,...);
 ```
 
@@ -296,37 +296,6 @@ MSCK [REPAIR] TABLE <table> [ADD|DROP|SYNC] PARTITIONS;
 ALTER TABLE <table> PARTITION (<partition> = '<value>') SET LOCATION '</HDFS_path>'
 ```
 
-##### 分区静态加载
-
-用户在加载数据时手动指定分区名称及对应数据文件
-
-```HQL
-load data [local] inpath '</file_path>'
-into table <table> partition (<partition>='<value>');
-
-INSERT INTO TABLE <table_target> PARTITION (<partition>='<value>')
-SELECT *
-FROM <table_source>
-WHERE <column>='<value>';
-```
-
-##### 分区动态加载
-
-动态分区插入数据时,Hive会根据指定的字段内容自动指定分区名称
-
-```HQL
--- 开启动态分区功能
-set hive.exec.dynamic.partition=true;
--- 指定动态分区模式,strict要求至少一个分区为静态分区
-set hive.exec.dynamic.partition.mode=[strict|nonstrict];
-
-INSERT INTO TABLE <table_target> PARTITION (<column>)
-SELECT <table_source.>*, <partition>
-FROM <table_source>;
-```
-
-**使用动态分区时只能使用`INSERT INTO`语法进行插入**  
-
 ##### 多重分区
 
 多重分区时,分区之间是一种递进关系,在迁移分区基础上继续分区  
@@ -350,7 +319,6 @@ INTO <N> BUCKETS;  -- 指定分桶数
 ```
 
 **分桶字段必须是表中存在的字段**  
-只能使用`INSERT INTO`语句向分桶表中添加数据
 
 - 在查询时使用`WHERE`子句指定分桶,避免全表扫描
 - 使用`JOIN`子句时若两表都根据相同列值进行了分桶,将提高连接效率
@@ -397,40 +365,6 @@ TBLPROPERTIES('transactional'='true');  -- 事务表必须设置transactional为
 ##### 事务表操作
 
 ```HQL
--- 使用`INSERT INTO`插入数据
-INSERT INTO <table> (
-    <column_1>,
-    <column_2>,
-    ...
-) VALUES (
-    <value_1>,
-    <value_2>,
-    ...
-);
-
--- 使用`CASE WHEN`将表中目标字段值修改为更新值覆写进表中
-INSERT OVERWRITE INTO <table>
-SELECT
-    <column_1>,
-    <column_2>,
-    ...,
-    CASE WHEN <column_target> = <value> THEN <value_target> END
-FROM <table>;
-
--- 将表中所有目标字段值不为删除值的行覆写进表中
-INSERT OVERWRITE INTO <table>
-SELECT
-    <column_1>,
-    <column_2>,
-    ...
-FROM <table>
-WHERE <column_target> != <value_target>;
-
--- 合并小文件
-INSERT OVERWRITE INTO <table>
-SELECT *
-FROM <table>;
-
 -- 复制表
 CREATE TABLE <table_target> AS
 SELECT *
@@ -473,4 +407,147 @@ SELECT
     <column_2>,
     ...
 FROM <view>;
+```
+
+## Hive DML
+
+### 从文件系统加载数据文件 `LOAD`
+
+```HQL
+-- 从Linux系统中加载数据文件
+LOAD DATA LOCAL INPATH '</file_path>' [OVERWRITE] INTO TABLE <table>;
+
+-- 从HDFS中获取数据文件
+LOAD DATA INPATH '</HDFS_path>' [OVERWRITE] INTO TABLE <table>;
+```
+
+`OVERWRITE`用于覆盖已有数据文件
+
+### 向表中插入数据 `INSERT`
+
+每次使用`INSERT`语句都会生成一个新的数据文件  
+使用`INSERT`插入数据时不需要指定数据分隔符
+
+```HQL
+-- 手动插入数据
+INSERT INTO <table> (<column_1>, <column_2>,...)
+VALUES
+  (<value_11>, <value_21>,...),
+  (<value_21>, <value_22>,...),
+  ...
+;
+
+-- 从已有表中选择数据插入
+INSERT INTO <table_target>
+SELECT *
+FROM <table_source>;
+
+-- 多重插入
+FROM <table_source>
+INSERT OVERWRITE TABLE <table_target_1>
+SELECT <column_11>, <column_12>, ...
+INSERT OVERWRITE TABLE <table_target_2>
+SELECT <column_21>, <column_22>, ...
+...;
+```
+
+### 分区表静态加载
+
+用户在加载数据时手动指定分区名称及对应数据文件
+
+```HQL
+LOAD DATA [LOCAL] INPATH '</file_path>'
+INTO TABLE <table> PARTITION (<partition> = '<value>');
+
+INSERT INTO TABLE <table_target> PARTITION (<partition> = '<value>')
+SELECT *
+FROM <table_source>
+WHERE <column>='<value>';
+```
+
+### 分区表动态加载
+
+动态分区插入数据时,Hive会根据指定的字段内容自动指定分区名称
+
+```HQL
+-- 开启动态分区功能
+set hive.exec.dynamic.partition=true;
+-- 指定动态分区模式,strict要求至少一个分区为静态分区
+set hive.exec.dynamic.partition.mode=[strict|nonstrict];
+
+INSERT INTO TABLE <table_target> PARTITION (<partition>)
+SELECT <table_source.>*, <partition>
+FROM <table_source>;
+```
+
+**使用动态分区时只能使用`INSERT INTO`语法进行插入**  
+
+### 分桶表数据加载
+
+分桶表只能使用`INSERT INTO`语句向分桶表中添加数据
+
+### 事务表`INSERT INTO`操作
+
+```HQL
+-- 使用`CASE WHEN`将表中目标字段值修改为更新值覆写进表中
+INSERT OVERWRITE INTO <table>
+SELECT
+    <column_1>,
+    <column_2>,
+    ...,
+    CASE WHEN <column_target> = <value> THEN <value_target> END
+FROM <table>;
+
+-- 将表中所有目标字段值不为删除值的行覆写进表中
+INSERT OVERWRITE INTO <table>
+SELECT
+    <column_1>,
+    <column_2>,
+    ...
+FROM <table>
+WHERE <column_target> != <value_target>;
+
+-- 合并小文件
+INSERT OVERWRITE INTO <table>
+SELECT *
+FROM <table>;
+```
+
+### 导出数据
+
+```HQL
+INSERT OVERWRITE [LOCAL] DIRECTORY '</directory_path>'
+[ROW FORMAT DELIMITED
+[FIELDS TERMINATED BY '<separator>' [ESCAPED BY '<separator>']]
+[COLLECTION ITEMS TERMINATED BY '<separator>']
+[MAP KEYS TERMINATED BY '<separator>']
+[LINES TERMINATED BY '<separator>']]
+[STORED AS <file_format>]
+SELECT <column_1>, <column_2>, ...
+FROM <table>;
+
+-- 多重导出
+FROM <table>
+INSERT OVERWRITE [LOCAL] DIRECTORY '</directory_path_1>'
+SELECT <column_11>, <column_12>, ...
+INSERT OVERWRITE [LOCAL] DIRECTORY '</directory_path_2>'
+SELECT <column_21>, <column_22>, ...
+...;
+```
+
+## Hive DQL
+
+```HQL
+[WITH <CTE> AS <CommonTableExpression>] 
+SELECT [DISTINCT]
+  <column_1>,
+  <column_2>,
+  ...
+FROM <table>
+[WHERE <expression>]
+[GROUP BY <column_1>, <column_2>, ...]
+[ORDER BY <column_1>, <column_2>, ... [ASC|DESC]]
+[[CLUSTER BY <column_1>, <column_2>, ...]|
+[DISTRIBUTE BY <column_1>, <column_2>, ...][SORT BY col_list]]
+[LIMIT [offset,] rows];
 ```
