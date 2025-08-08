@@ -6,83 +6,52 @@
 
 ### 查看数据库版本
 
-~~~mysql
+```sql
 SELECT version();
-~~~
-
-### 创建表空间
-
-~~~sql
-CREATE TABLESPACE waterboss
-DATAFILE '/home/orcale/waterboss.dbf' -- 物理文件存储路径
-SIZE 10m -- 初始化物理文件大小
-AUTOEXTEND ON -- 物理文件存储不足时自动扩容
-NEXT 10m ; -- 自动扩容大小为10m
-~~~
-
-* `waterboss` 表空间名
-* `DATAFILE` 物理文件存储路径
-* `SIZE` 初始化物理文件大小
-* `AUTOEXTEND` 物理文件存储不足时自动扩容 `ON` 开启 `OFF` 关闭
-* `NEXT` 物理文件存储不足时自动扩容大小，`AUTOEXTEND ON` 时生效
-
-### 删除表空间
-
-~~~Oracle
--- 只删除表空间
-DROP TABLESPACE <表空间名> ;
--- 删除表空间及其下数据文件
-DROP TABLESPACE <表空间名> INCLUDING CONTENTS AND DATAFILES ;
-~~~
-
-### 创建用户
-
-~~~Oracle
-CREATE USER <用户名> DEFAULT TABLESPACE <默认表空间名> IDENTIFIED BY <密码>;
-~~~
+```
 
 ### 查看数据库
 
-~~~MySQL
+```sql
 SHOW DATABASES;
-~~~
+```
 
 ### 查看当前数据库
 
-~~~mysql
+```sql
 SELECT DATABASE;
-~~~
+```
 
 ### 创建数据库
 
-~~~mysql
+```sql
 CREATE DATABASE [IF NOT EXISTS] <库名> [CHARACTER SET utf8mb4 COLLATE tf8mb4_unicode_ci]；
-~~~
+```
 
 ### 切换数据库
 
-~~~mysql
+```sql
 USE <库名>;
-~~~
+```
 
 ### 删除数据库
 
-~~~sql
+```sql
 DROP DATABASE [IF EXISTS] <库名>;
-~~~
+```
 
 ### 创建表
 
-~~~sql
+```sql
 CREATE TABLE [IF NOT EXISTS] [<库名>.]<表名> (
  <字段1>  字段类型 [约束] [comment '注释1']，
     <字段2>  字段类型 [约束] [comment '注释2']，
     ...
  <字段n>  字段类型 [约束] [comment '注释n']
  );
-~~~
+```
 
-#### MySQL字段类型
+#### 数据类型
 
 `数值`
 
@@ -117,8 +86,8 @@ CREATE TABLE [IF NOT EXISTS] [<库名>.]<表名> (
 
 示例：
 
-~~~mysql
-CREATE TABLE emp_info(
+```sql
+CREATE TABLE emp_info (
  serial_num INT PRIMARY KEY NOT NULL comment '编号',
  emp_num VARCHAR(10) NOT NULL comment '员工工号',
  name VARCHA(10) NOT NULL comment '员工姓名',
@@ -126,83 +95,39 @@ CREATE TABLE emp_info(
  age TINYINT comment '年龄',
  id_num CHAR(18) NOT NULL unique comment '身份证号',
  hiredate DATE NOT NULL comment '入职时间'
- );
-~~~
-
-#### Oracle字段类型
-
-`数值`
-
-|     关键词      |          描述          |
-| :-------------: | :--------------------: |
-| `NUMBER(M[,D])` | M：总位数，D：小数位数 |
-
-`字符串`
-
-输入数据时使用单引号 `' '`
-
-|   关键词   |       字符串类型       |               描述               |
-| :--------: | :--------------------: | :------------------------------: |
-|   `CHAR`   | 定长字符串(需指定长度) | 按设置字符长度存储，最多2000字节 |
-| `VARCHAR2` | 变长字符串(需指定长度) | 按实际字符长度存储，最多4000字节 |
-|   `LONG`   |       大文本类型       |             最大2GB              |
-
-`日期时间`
-
-输入数据时使用单引号 `' '`
-
-|   关键词    |         时间日期类型         |
-| :---------: | :--------------------------: |
-|   `DATE`    |        日期，精确到秒        |
-| `TIMESTAMP` | 时间戳 ，精确到秒小数点后9位 |
-
-`二进制型`
-
-|        |      |      |
-| :----: | :--: | :--: |
-| `CLOB` |      |      |
-| `BLOB` |      |      |
-
-`约束类型`
-
-|    关键词     | 约束类型 |          描述          |
-| :-----------: | :------: | :--------------------: |
-| `PRIMARY KEY` | 主键约束 |       非空切唯一       |
-|   `UNIQUE`    | 唯一约束 |          唯一          |
-|  `NOT NULL`   | 非空约束 |          非空          |
-| `DEFAULT ' '` | 默认约束 | 未指定数据时设置默认值 |
-| `FOREIGN KEY` | 外键约束 |   在两张表间建立连接   |
+);
+```
 
 ### 查看建表语句
 
-~~~sql
+```sql
 SHOW CREATE TABLE [<库名>.]<表名>;
-~~~
+```
 
 ### 查看表
 
-~~~sql
+```sql
 SHOW TABLES;
-~~~
+```
 
 查询指定数据库中的所有表名
 
-~~~sql
+```sql
 -- 从'information_schema'数据库的'tables'表中查询指定数据库的表名
 SELECT table_name  
 FROM information_schema.tables 
 WHERE table_schema = '<数据库名>'; -- 指定数据库
-~~~
+```
 
 ### 查看表结构
 
-~~~sql
+```sql
 DESC [<库名>.]<表名>;
-~~~
+```
 
 ### 修改表结构
 
-~~~sql
+```sql
 -- 添加字段
 ALTER TABLE [<库名>.]<表名> ADD <字段名> 字段类型 [约束] [comment '注释'];
 -- 修改字段类型
@@ -211,7 +136,7 @@ ALTER TABLE [<库名>.]<表名> MODIFY <字段名> 字段类型;
 ALTER TABLE [<库名>.]<表名> CHANGE <字段名> <新字段名> 字段类型 [约束] [comment '注释'];
 -- 删除字段
 ALTER TABLE [<库名>.]<表名> DROP <字段名>；
-~~~
+```
 
 `MODIFY` 只能修改字段类型，不能与已有数据冲突
 
@@ -221,9 +146,9 @@ ALTER TABLE [<库名>.]<表名> DROP <字段名>；
 
 ### 删除表
 
-~~~sql
+```sql
 DROP TABLE [IF EXISTS] [<库名>.]<表名>;
-~~~
+```
 
 ## DML data manipulation language
 
@@ -231,14 +156,15 @@ DROP TABLE [IF EXISTS] [<库名>.]<表名>;
 
 ### 插入数据
 
-~~~sql
+```sql
 INSERT INTO [<库名>.]<表名> (<字段1>，<字段2>,...,<字段n>)
 VALUES
- (<值11>,<值12>,...,<值1n>)[,-- 使用','分割进行多行插入
+ (<值11>,<值12>,...,<值1n>),-- 使用','分割进行多行插入
  (<值21>,<值22>,...,<值2n>),
  ...
- (<值n1>,<值n2>,...,<值nn>)];
-~~~
+ (<值n1>,<值n2>,...,<值nn>)
+;
+```
 
 ​使用自动增长 `AUTO_INCREMENT` 、默认约束 `DEFAULT` 时可以省略对应字段  
 ​两种情况下 `(<字段1>，<字段2>,...,<字段n>)` 可以全部省略：
@@ -248,7 +174,7 @@ VALUES
 
 ### 更新数据
 
-~~~sql
+```sql
 UPDATE [<库名>.]<表名>
 -- 更新的数据内容
 SET <字段1> = <新值1>[,
@@ -257,14 +183,14 @@ SET <字段1> = <新值1>[,
     <字段n> = <新值n>]
 -- 指定要更新的行,不指定时对所有行的指定字段数据进行修改
 WHERE <判断条件>;
-~~~
+```
 
 ### 删除数据
 
-~~~sql
+```sql
 DELETE FROM [<库名>.]<表名>
 [WHERE <判断条件>];-- 省略 WHERE <判断条件> 时删除<表名>的所有内容
-~~~
+```
 
 ## DQL data query language
 
@@ -272,10 +198,10 @@ DELETE FROM [<库名>.]<表名>
 
 ### 简单查询
 
-~~~sql
+```sql
 SELECT <字段1>,<字段2>,...,<字段n>
 FROM [<库名>.]<表名>;
-~~~
+```
 
 ​ 可以使用 `*` 表示所有字段，数据量大时避免使用
 
@@ -285,10 +211,10 @@ FROM [<库名>.]<表名>;
 
 `AS` 在同一条代码中便捷输入及显示库、表、字段
 
-~~~sql
+```sql
 SELECT <字段1>[ AS <别名1>],<字段2>[ AS <别名2>]
 FROM [<库名>.]<表名>;
-~~~
+```
 
 ​ 别名只在当前语句中生效
 
@@ -296,20 +222,20 @@ FROM [<库名>.]<表名>;
 
 `DISTINCT` 去除 `<字段名>` 中重复出现的值
 
-~~~sql
+```sql
 SELECT DISTINCT <字段名>
 FROM [<库名>.]<表名>;
-~~~
+```
 
 ### 条件查询
 
 `WHERE <判断条件>`  根据 `<判断条件>` 选择进行运算的数据
 
-~~~sql
+```sql
 SELECT <字段1>,<字段2>,...,<字段n>
 FROM [<库名>.]<表名>
 WHERE <判断条件>;
-~~~
+```
 
 |  逻辑运算符  |     功能     |
 | :----------: | :----------: |
@@ -338,10 +264,27 @@ WHERE <判断条件>;
 
 `GROUP BY <字段名>` 根据 `<字段名>` 数据内容进行分组，返回各组第一个数据所在行的数据
 
-~~~sql
+```sql
 SELECT <字段1>,<字段2>,...,<字段n>
 FROM [<库名>.]<表名>
 GROUP BY <字段名>;
-~~~
+```
 
 ### 聚合函数
+
+```sql
+SELECT <aggregate function>(column), ... FROM <table>;
+```
+
+**常用聚合函数：**
+
+| 函数 | 功能 |
+| - | - |
+| `COUNT` | 统计数量 |
+| `MAX` | 最大值 |
+| `MIN` | 最小值 |
+| `AVG` | 平均值 |
+| `SUM` | 求和 |
+
+* 聚合函数会忽略空值 `NULL` ，可以使用 `COALESCE` 函数进行处理
+* `AVG(<expression>)` 可以用于计算满足 `<expression>` 的行数占比
