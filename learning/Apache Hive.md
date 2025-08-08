@@ -55,13 +55,13 @@ HQL的DDL与DML本质上是修改元数据
 
 ### 复杂数据类型
 
-**`ARRAY`** \<type>
+**`ARRAY <type>`**
 
-**`MAP`** <key_type, value_type>
+**`MAP <key_type, value_type>`**
 
-`STRUCT` <name, type>
+`STRUCT <name_1, type_1, name_2, type_2, ...>`
 
-`UNION` <type, type, ...>
+`UNION <type, type, ...>`
 
 | 特性 | ARRAY | MAP | STRUCT | UNIONTYPE |
 | - | - | - | - | - |
@@ -74,13 +74,218 @@ HQL的DDL与DML本质上是修改元数据
 | 声明示例 | ARRAY\<STRING> | MAP<STRING, INT> | STRUCT<street: STRING, city: STRING, zip: INT> | UNIONTYPE<INT, FLOAT, STRING> |
 | 值示例 | ['apple', 'banana', 'orange'] | {'color': 'red', 'size': 10} | {'street': 'Main St', 'city': 'Anytown', 'zip': 12345} | create_union(0, 42)(INT 42) 或 create_union(2, "error")(STRING "error") |
 
+复杂数据类型可以结合使用
+
+`ARRAY<MAP<key_type, value_type>>`
+
+`STRUCT<name, STRUCT<name, type>>`
+
+## 运算符
+
+**关系运算符**：
+
+| 符号 | 功能 |
+| - | - |
+| `=` `==` | 等值比较 |
+| `<>` `!=` | 不等值比较 |
+| `<` | 小于比较 |
+| `<=` | 小于等于比较 |
+| `>` | 大于比较 |
+| `>=` | 大于等于比较 |
+| `IS NULL` | 空值判断 |
+| `IS NOT NULL` | 非空判断 |
+| `LIKE` | LIKE比较 |
+| `RLIKE` | JAVA的LIKE操作 |
+| `REGEXP` | REGEXP操作 |
+
+**算术运算符**：
+
+| 符号 | 功能 |
+| - | - |
+| `+` | 加法 |
+| `-` | 减法 |
+| `*` | 乘法 |
+| `/` | 除法 |
+| `div` | 取整 |
+| `%` | 取余 |
+| `&` | 位与 |
+| `\|` | 位或 |
+| `^` | 位异或 |
+| `~` | 位取反 |
+
+**逻辑运算符**：
+
+| 符号 | 功能 |
+| - | - |
+| `AND` | 与 |
+| `OR` | 或 |
+| `NOT` | 非 |
+| `IN` | 在 |
+| `NOT IN` | 不在 |
+| `EXISTS` | 存在 |
+| `NOT EXISTS` | 不存在 |
+
+### Hive 正则表达式
+
+| 功能 | Hive | Linux BRE | Linux ERE | PCRE |
+| - | :-: | :-: | :-: | :-: |
+| 基本匹配 | ✓ | ✓ | ✓ | ✓ |
+| 量词 `{n,m}` | ✓ | 需转义 | ✓ | ✓ |
+| 或操作 `\|` | ✓ | ✗ | ✓ | ✓ |
+| 分组 `()` | ✓ | 需转义 | ✓ | ✓ |
+| 预定义字符类 `\d` | ✓ | ✗ | ✗ | ✓ |
+| 单词边界 `\b` | ✓ | ✗ | ✗ | ✓ |
+| 非贪婪匹配 `*?` | ✓ | ✗ | ✗ | ✓ |
+| 回溯引用 `\1` | ✓ | ✓ | ✓ | ✓|
+| 前瞻后顾 | ✓ | ✗ |  | ✓ |
+| 命名分组 | ✓ | ✗ | ✗ | ✓ |
+
+- 在Hive中：
+  - 始终使用双反斜杠转义
+  - 利用Java正则的高级特性
+  - 测试时使用在线Java正则测试工具
+- 在Linux中：
+  - 明确工具使用的标准：
+    - grep 默认BRE
+    - grep -E 使用ERE
+    - grep -P 使用PCRE
+  - 优先使用POSIX字符类增强可移植性
+  - 对于复杂需求,考虑使用Python脚本
+
+## 函数
+
+```sql
+-- 查看函数
+SHOW FUNCTIONS;
+DESCRIBE FUNCTION EXTENED <function>;
+```
+
+### 数学函数
+
+| 函数名 | 描述 |
+| - | - |
+| rand() | 返回 0 到 1 之间的随机数(每次调用结果不同) |
+| round(x[, d]) | 四舍五入到指定小数位(默认 0 位) |
+| mod(x,y) | 返回 x 除以 y 的余数(等同于 %) |
+| pow(x,y) | 计算 x 的 y 次幂 |
+| floor(x) | 向下取整(返回小于等于 x的最大整数) |
+| ceil(x) | 向上取整(返回大于等于 x的最小整数) |
+| abs(x) | 返回 x 的绝对值 |
+
+### 字符串函数
+
+| 函数名 | 描述 | 示例 | 结果 |
+| - | - | - | - |
+| length(str) | 返回字符串的字符数 | length('Hello') | 5 |
+| empty(str) | 判断字符串是否为空(长度为0) | empty('') | true |
+| substr(str, start[, length]) | 从指定下标开始截取字符串(下标从1开始) | substr('Hello', 2, 3) | ell |
+| concat(str1, str2, ...) | 连接多个字符串 | concat('Hello',' ', 'World'); | Hello World |
+| concat_ws(sep, str1, str2,...) | 使用分隔符连接多个字符串 | concat_ws('-','a', 'b', 'c'); | a-b-c |
+| upper(str) | 将字符串转换为大写 | upper('hello'); | HELLO |
+| lower(str) | 将字符串转换为小写 | lower('WORLD'); | world |
+| instr(str, substr) | 返回子串第一次出现的位置(从1 开始) | instr('Hello','l'); | 3 |
+| split(str, regex) | 将字符串按正则表达式分割为数组 | split('a,b,c',','); | ["a","b","c"] |
+| translate(str, from_str, to_str) | 字符替换(按位置映射) | translate('abcxyz', 'abc','123'); | 123xyz |
+| regexp_replace(str, pattern, replacement) | 使用正则表达式替换匹配的子串 | regexp_replace('a1b2c', '\\d','X'); | aXbXc |
+
+### 日期函数
+
+| 函数名 | 描述 | 示例 | 结果 |
+| - | - | - | - |
+| current_date() | 返回当前日期(DATE 类型) | current_date() | 2025-05-27 |
+| current_timestamp() | 返回当前时间戳(TIMESTAMP 类型) | current_timestamp() | 2025-05-2712:34:56.789 |
+| unix_timestamp() | 返回当前Unix 时间戳(整数,秒级) | unix_timestamp() | 1748354096 |
+| year([date\|timestamp]) | 返回年份 | year('2025-05-27') | 2025 |
+| month([date\|timestamp]) | 返回月份(1-12) | month('2025-05-27') | 5 |
+| day([date\|timestamp]) | 返回日期(1-31) | day('2025-05-27') | 27 |
+| hour(timestamp) | 返回小时(0-23) | hour('2025-05-2712:34:56') | 12 |
+| minute(timestamp) | 返回分钟(0-59) | minute('2025-05-27 12:34:56') | 34 |
+| second(timestamp) | 返回秒(0-59) | second('2025-05-27 12:34:56') | 56 |
+| date_add(date, n) | 日期加 n 天 | date_add('2025-05-27', 3) | 2025-05-30 |
+| date_sub(date, n) | 日期减 n 天 | date_sub('2025-05-27', 3) | 2025-05-24 |
+| add_months(date, n) | 日期加 n 个月 | add_months('2025-05-27', 1) | 2025-06-27 |
+| months_between(date1,date2) | 计算两个日期相差的月数 | months_between('2025-06-01','2025-05-01') | 1.0 |
+| datediff(enddate,startdate) | 计算两个日期相差的天数 | datediff('2025-05-30', '2025-05-27') | 3 |
+| from_unixtime(unix_timestamp, format) | 将 Unix 时间戳转换为字符串 | from_unixtime(1748323200) | 2025-05-2700:00:00 |
+| date_format([date\|timestamp], format) | 按指定格式格式化日期 | date_format('2025-05-27', 'yyyy-MM-dd') | 2025-05-27 |
+| to_date([timestamp\|strin]g) | 将时间戳或字符串转为DATE 类型 | to_date('2025-05-27 12:34:56') | 2025-05-27 |
+| trunc(date, format) | 按指定单位截断日期(如月份、季度) | trunc('2025-05-27', 'MM') | 2025-05-01 |
+
+### 类型转换函数
+
+`CAST(expr AS type)`
+
+**关键注意事项**：
+
+- 范围与精度
+  - 大范围类型 → 小范围类型(如 BIGINT → INT)可能溢出,结果为 NULL
+  - 浮点类型转整数类型时直接截断小数(不四舍五入)
+  - DECIMAL 转其他数值类型时,超出目标精度/范围会返回 NULL
+- 字符串解析
+  - 字符串转数字/时间时,格式无效则返回 NULL
+  - 布尔字符串仅识别 "true"/"false"(不区分大小写)
+- 时间类型
+  - TIMESTAMP ↔ DATE 转换会丢弃或补足时间部分
+  - 字符串转时间需严格匹配格式(可通过 CAST(x AS STRING) 验证格式)
+- 隐式转换
+  - Hive 在某些场景(如比较、表达式计算)会自动进行类型转换,规则可能与 CAST 不同
+
+| 源数据类型 | 目标数据类型 | 是否支持 | 说明与注意事项 |
+| - | - | - | - |
+| TINYINT | BOOLEAN | 是 | 非0值 → true；0 → false |
+| | SMALLINT | 是 | 直接转换 |
+| | INT | 是 | 直接转换 |
+| | BIGINT | 是 | 直接转换 |
+| | FLOAT | 是 | 可能损失精度 |
+| | DOUBLE | 是 | 可能损失精度 |
+| | DECIMAL | 是 | 保留精确值 |
+| | STRING | 是 | 转换为数字字符串 |
+| | VARCHAR | 是 | 同 STRING |
+| | CHAR | 是 | 同 STRING |
+| | TIMESTAMP | 否 | 不支持直接转换 |
+| | DATE | 否 | 不支持 |
+| | BINARY | 否 | 不支持 |
+| SMALLINT | ... | 是 | 类似 TINYINT 规则(支持数值/STRING/VARCHAR/CHAR/DECIMAL) |
+| INT | ... | 是 | 类似 TINYINT 规则 |
+| BIGINT | ... | 是 | 类似 TINYINT 规则；转 FLOAT/DOUBLE 时精度损失风险更高 |
+| FLOAT | BOOLEAN | 是 | 非0.0 → true；0.0 → false |
+| | TINYINT | 是 | 小数部分截断(不四舍五入) |
+| | SMALLINT | 是 | 小数部分截断 |
+| | INT | 是 | 小数部分截断 |
+| | BIGINT | 是 | 小数部分截断 |
+| | DOUBLE | 是 | 可能损失精度 |
+| | DECIMAL | 是 | 可能损失精度(DECIMAL 精度有限) |
+| | STRING | 是 | 转换为科学计数法或数字字符串 |
+| DOUBLE | ... | 是 | 类似 FLOAT 规则；精度损失风险更高 |
+| DECIMAL | BOOLEAN | 是 | 非0 → true；0 → false |
+| | TINYINT | 是 | 小数部分截断(若超出目标范围返回 NULL) |
+| | FLOAT/DOUBLE | 是 | 可能损失精度和范围 |
+| | STRING | 是 | 精确数字字符串 |
+| BOOLEAN | TINYINT | 是 | true → 1；false → 0 |
+| | STRING | 是 | true → "true"；false → "false" |
+| STRING / VARCHAR / CHAR | BOOLEAN | 是 | "true" → true；"false" → false(不区分大小写)；其他字符串 → NULL |
+| | TINYINT | 是 | 需为有效整数字符串(否则 NULL) |
+| | FLOAT/DOUBLE | 是 | 需为有效数字字符串(否则 NULL) |
+| | DECIMAL | 是 | 需为有效数字字符串(否则 NULL) |
+| | TIMESTAMP | 是 | 需匹配格式(如 "yyyy-MM-dd HH:mm:ss"),失败则 NULL |
+| | DATE | 是 | 需匹配格式(如 "yyyy-MM-dd"),失败则 NULL |
+| | BINARY | 是 | 将字符串转为二进制表示 |
+| TIMESTAMP | STRING | 是 | 默认格式转为字符串 |
+| | VARCHAR | 是 | 同 STRING |
+| | CHAR | 是 | 同 STRING |
+| | DATE | 是 | 丢弃时间部分,保留日期 |
+| | BIGINT | 是 | 转为 Unix 时间戳(毫秒) |
+| DATE | STRING | 是 | 默认格式转为字符串 |
+| | TIMESTAMP | 是 | 时间部分补零(00:00:00) |
+| BINARY | STRING | 是 | 按 UTF-8 解析(可能乱码) |
+
 ## Hive DDL
 
 ### 数据库
 
 **创建数据库**  
 
-```HQL
+```sql
 CREATE [DATABASE|SCHEMA] [IF NOT EXISTS] <database>
 [COMMENT '<comment>']
 LOCATION '</HDFS_path>'
@@ -89,31 +294,31 @@ LOCATION '</HDFS_path>'
 
 **查看数据库结构**  
 
-```HQL
+```sql
 DESCRIBE DATABASE [EXTENDED] <database>;
 ```
 
 **查看数据库建库语句**  
 
-```HQL
+```sql
 SHOW CREATE DATABASE <database>;
 ```
 
 **切换数据库**  
 
-```HQL
+```sql
 USE <database>;
 ```
 
 **删除数据库**  
 
-```HQL
+```sql
 DROP DATABASE <database> [RESTRICT|CASCADE];  -- 默认RESTRICT只能删除空库,CASCADE用于强制删除
 ```
 
 **修改数据库属性**  
 
-```HQL
+```sql
 ALTER DATABASE <database> SET DBPROPERTIES ('<property>'='<value>', ...);
 ALTER DATABASE <database> SET OWNER [USER|ROLE] <account_type>;
 ALTER DATABASE <database> SET LOCATION '</HDFS_path>';
@@ -121,14 +326,14 @@ ALTER DATABASE <database> SET LOCATION '</HDFS_path>';
 
 **查询所有数据库**  
 
-```HQL
+```sql
 SHOW DATABASES;
 SHOW SCHEMAS;
 ```
 
 **查看当前数据库**  
 
-```HQL
+```sql
 SELECT current_database();
 ```
 
@@ -136,11 +341,11 @@ SELECT current_database();
 
 **完整建表语句**  
 
-```HQL
+```sql
 CREATE [TEMPORARY] [EXTERNAL] TABLE [IF NOT EXISTS] [<database>.]table (
-    <column_1> <type_1> [COMMENT <comment_1>],
-    <column_2> <type_2> [COMMENT <comment_2>],
-    ...
+  <column_1> <type_1> [COMMENT <comment_1>],
+  <column_2> <type_2> [COMMENT <comment_2>],
+  ...
 ) [COMMENT <comment>]
 [PARYTITIONED BY (<column> <type> [COMMENT <comment>], ...)]
 [CLUSTERED BY (<column_1>, <column_2>, ...) [SORTED BY (<column>) [ASC|DESC], ...] INTO <num_buckets> BUCKETS]
@@ -156,16 +361,28 @@ CREATE [TEMPORARY] [EXTERNAL] TABLE [IF NOT EXISTS] [<database>.]table (
 [TBLPROPERTIES ('<property>'='<value>', ...)];
 ```
 
+**复制表[数据|结构]**
+
+```sql
+CREATE TABLE <table_target> AS
+SELECT *
+FROM <table_source>;
+
+CREATE TABLE <table_target>  LIKE
+SELECT *
+FROM <table_source>;
+```
+
 **查看表元数据**  
 
-```HQL
+```sql
 DESCRIBE [EXTENED] <table>;
 DESCRIBE FORMATTED <table>;
 ```
 
 **删除表**  
 
-```HQL
+```sql
 DROP TABLE [IF EXISTS] <table> [PURGE];
 TRUNCATE [TABLE] <table>;
 ```
@@ -180,7 +397,7 @@ TRUNCATE [TABLE] <table>;
 
 **修改表**  
 
-```HQL
+```sql
 -- 更改表名
 ALTER TABLE <table_name> RENAME TO <new_table_name>;
 
@@ -217,7 +434,7 @@ ALTER TABLE <table> [ADD|REPLACE] COLUMNS (<column> <type>,...);
 
 **查询所有表**  
 
-```HQL
+```sql
 SHOW TABLES [IN <database>];
 ```
 
@@ -255,30 +472,31 @@ SHOW TABLES [IN <database>];
 
 Hive支持根据指定字段进行分区  
 实质是建立一个新的字段,并在HDFS中将不同分区的数据文件分别存储,当使用分区查询时只查询对应路径下的数据文件  
+分区字段数据需要满足HDFS中的路径要求,不能使用中文,不能出现空格
 **分区字段不能是表中存在的字段**
 
-```HQL
+```sql
 CREATE TABLE <table> (
-    <column_1> <type_1>,
-    <column_2> <type_2>,
-    ...
+  <column_1> <type_1>,
+  <column_2> <type_2>,
+  ...
 ) PARTITIONED BY (<partition_1> <type_1>, <partition_2> <type_2>, ...);
 ```
 
 **查询分区**  
 
-```HQL
+```sql
 SHOW PARTITIONS <table>;
 SHOW TABLE EXTENDED [IN|FROM <database>] LIKE <table>;
 ```
 
 **修改分区表**  
 
-```HQL
+```sql
 -- 增加分区/多重分区/多个分区
 ALTER TABLE <table> ADD
-    PARTITION (<partition_1> = '<value_1>'[, <partition_2> = '<value_2>', ...]) LOCATION '/<HDFS_path_1>'
-   [PARTITION (<partition_3> = '<value_3>') LOCATION '/<HDFS_path_2>'];
+  PARTITION (<partition_1> = '<value_1>'[, <partition_2> = '<value_2>', ...]) LOCATION '/<HDFS_path_1>'
+ [PARTITION (<partition_3> = '<value_3>') LOCATION '/<HDFS_path_2>'];
 
 -- 重命名分区
 ALTER TABLE <table> PARTITION <partiton> RENAME TO PARTITION <new_partiton>;
@@ -308,11 +526,11 @@ ALTER TABLE <table> PARTITION (<partition> = '<value>') SET LOCATION '</HDFS_pat
 分桶表是一种用于优化查询而设计的表类型  
 分桶时需要指定分桶字段及分桶数,桶编号相同的数据会被分到同一个桶中  
 
-```HQL
+```sql
 CREAT TABLE <table> (
-    <column_1> <type_1>,
-    <column_2> <type_2>,
-    ...
+  <column_1> <type_1>,
+  <column_2> <type_2>,
+  ...
 ) CLUSTERED BY (<column>)  -- 指定分桶的字段
 [SORTED BY (<column>) [ASC|DESC], ...]  -- 指定分桶后排序的字段
 INTO <N> BUCKETS;  -- 指定分桶数
@@ -340,7 +558,7 @@ INTO <N> BUCKETS;  -- 指定分桶数
 Hive在设计之初因为工作原理而不支持事务  
 在Hive0.14版本中增加了对对事务的简单支持
 
-```HQL
+```sql
 -- 设置Hive支持并发
 set hive.support.concurrency = true;
 -- 设置开启分桶功能,从Hive2.0开始不再需要
@@ -354,26 +572,12 @@ set hive.compactor.initiator.on = true;
 set hive.compactor.worker.threads = 1;
 
 CREATE TABLE <table>(
-    <column_1> <type_1>,
-    <column_2> <type_2>,
-    ...
+  <column_1> <type_1>,
+  <column_2> <type_2>,
+  ...
 ) CLUSTERED BY (<column>) INTO <N> BUCKETS  -- 事务表必须是分桶表
 STROED AS ORC  -- 事务表必须以ORC格式存储
 TBLPROPERTIES('transactional'='true');  -- 事务表必须设置transactional为true
-```
-
-##### 事务表操作
-
-```HQL
--- 复制表
-CREATE TABLE <table_target> AS
-SELECT *
-FROM <table_source>;
-
--- 复制表结构
-CREATE TABLE <table_target>  LIKE
-SELECT *
-FROM <table_source>;
 ```
 
 ##### 事务表的局限性
@@ -390,22 +594,22 @@ Hive中的视图只保存DQL语句,不实际存储数据,无法提高查询性�
 创建视图时将固定视图架构,如果基础表被更改或删除将导致视图失效  
 无法向视图中插入数据
 
-```HQL
+```sql
 -- 创建视图
 CREATE VIEW <view> AS
 SELECT
-    <column_1>,
-    <column_2>,
-    ...
+  <column_1>,
+  <column_2>,
+  ...
 FROM [<table>|<view>]
 [WHERE <experssion>]
 [LIMIT <N_START>,<NUM_ROW>];
 
 -- 使用视图
 SELECT
-    <column_1>,
-    <column_2>,
-    ...
+  <column_1>,
+  <column_2>,
+  ...
 FROM <view>;
 ```
 
@@ -413,7 +617,7 @@ FROM <view>;
 
 ### 从文件系统加载数据文件 `LOAD`
 
-```HQL
+```sql
 -- 从Linux系统中加载数据文件
 LOAD DATA LOCAL INPATH '</file_path>' [OVERWRITE] INTO TABLE <table>;
 
@@ -428,7 +632,7 @@ LOAD DATA INPATH '</HDFS_path>' [OVERWRITE] INTO TABLE <table>;
 每次使用`INSERT`语句都会生成一个新的数据文件  
 使用`INSERT`插入数据时不需要指定数据分隔符
 
-```HQL
+```sql
 -- 手动插入数据
 INSERT INTO <table> (<column_1>, <column_2>,...)
 VALUES
@@ -455,7 +659,7 @@ SELECT <column_21>, <column_22>, ...
 
 用户在加载数据时手动指定分区名称及对应数据文件
 
-```HQL
+```sql
 LOAD DATA [LOCAL] INPATH '</file_path>'
 INTO TABLE <table> PARTITION (<partition> = '<value>');
 
@@ -469,7 +673,7 @@ WHERE <column>='<value>';
 
 动态分区插入数据时,Hive会根据指定的字段内容自动指定分区名称
 
-```HQL
+```sql
 -- 开启动态分区功能
 set hive.exec.dynamic.partition=true;
 -- 指定动态分区模式,strict要求至少一个分区为静态分区
@@ -488,22 +692,22 @@ FROM <table_source>;
 
 ### 事务表`INSERT INTO`操作
 
-```HQL
+```sql
 -- 使用`CASE WHEN`将表中目标字段值修改为更新值覆写进表中
 INSERT OVERWRITE INTO <table>
 SELECT
-    <column_1>,
-    <column_2>,
-    ...,
-    CASE WHEN <column_target> = <value> THEN <value_target> END
+  <column_1>,
+  <column_2>,
+  CASE WHEN <column_target> = <value> THEN <value_target> END,
+  ...,
 FROM <table>;
 
 -- 将表中所有目标字段值不为删除值的行覆写进表中
 INSERT OVERWRITE INTO <table>
 SELECT
-    <column_1>,
-    <column_2>,
-    ...
+  <column_1>,
+  <column_2>,
+  ...
 FROM <table>
 WHERE <column_target> != <value_target>;
 
@@ -515,7 +719,7 @@ FROM <table>;
 
 ### 导出数据
 
-```HQL
+```sql
 INSERT OVERWRITE [LOCAL] DIRECTORY '</directory_path>'
 [ROW FORMAT DELIMITED
 [FIELDS TERMINATED BY '<separator>' [ESCAPED BY '<separator>']]
@@ -537,7 +741,9 @@ SELECT <column_21>, <column_22>, ...
 
 ## Hive DQL
 
-```HQL
+Hive中DQL语句与一般SQL的DQL无太大差异,可以参考`Oracle Datebase.md`和`SQL.md`中相关内容
+
+```sql
 [WITH <CTE> AS <CommonTableExpression>] 
 SELECT [DISTINCT]
   <column_1>,
@@ -548,6 +754,129 @@ FROM <table>
 [GROUP BY <column_1>, <column_2>, ...]
 [ORDER BY <column_1>, <column_2>, ... [ASC|DESC]]
 [[CLUSTER BY <column_1>, <column_2>, ...]|
-[DISTRIBUTE BY <column_1>, <column_2>, ...][SORT BY col_list]]
+[DISTRIBUTE BY <column_1>, <column_2>, ...][SORT BY <column_1>, <column_2>, ...]]
 [LIMIT [offset,] rows];
 ```
+
+使用正则表达式时需要用反引号` `` `包裹
+
+### Hive的DQL执行顺序
+
+1. FROM
+2. WHERE
+3. GROUP BY
+4. HAVING
+5. ORDER BY
+6. SELECT
+
+### ORDER BY
+
+Hive底层使用MapReduce引擎,如果`ORDER BY`的行数太大,会导致需要很长的时间才能完成全局排序  
+建议与`LIMIT`一起使用避免结果集过大
+
+Hive中NULL值视为最小
+
+### CLUSTER BY
+
+`CLUSTER BY`可以指定字段组合将数据依据Reduce Task数量哈希分组,每组内再根据这个字段组合正序排序
+
+Reduce Task数量的确定：
+
+```mermaid
+graph TD
+  A[Reduce Task数量] --> B{用户是否手动设置?}
+  B -->|是| C[直接使用设置值]
+  B -->|否| D[自动计算]
+  D --> E[基于输入数据量计算]
+  D --> F[特殊操作符覆盖]
+  D --> G[执行引擎特性]
+```
+
+默认设置每个Reduce Task处理256MB数据,上限1009个
+
+### DISTRIBUTE BY + SORT BY
+
+`DISTRIBUTE BY`类似`CLUSTER BY`,可以按指定字段进行哈希分组
+
+`SORT BY`在每个Reduce Task分组内对指定字段进行排序,全局无序
+
+当`DISTRIBUTE BY`和`SORT BY`指定同一字段时可以起到`CLUSTER BY`的效果
+
+### CTE Common Table Expression
+
+公用表表达式(CTE)是一个临时结果集,该结果集是从WITH子句中指定的简单查询派生而来的,该查询紧接在SELECT或INSERT关键字之前
+CTE仅在单个语句的执行范围内定义
+一个或多个CTE可以在`SELECT`,`INSERT`, `CREATE TABLE AS SELECT`或`CREATE VIEW AS SELECT`语句中使用
+
+```sql
+WITH <CTE> AS (
+  SELECT <column_1>, <column_2>, ... 
+  FROM <table>
+)
+SELECT <column_1>, <column_2>, ... 
+FROM <CTE>;
+
+-- from风格
+WITH <CTE> AS (
+  SELECT <column_1>, <column_2>, ... 
+  FROM <table>
+)
+FROM <CTE>
+SELECT <column_1>, <column_2>, ... ;
+
+-- chaining CTEs 链式
+WITH <CTE_1> AS (
+  SELECT <column_1>, <column_2>, ... 
+  FROM <table>
+),
+<CTE_2> AS (
+  SELECT <column_1>, <column_2>, ... 
+  FROM <CTE_1>
+)
+SELECT <column_1>, <column_2>, ... 
+FROM (
+  SELECT <column_1>, <column_2>, ... 
+  FROM <CTE_2>
+) <alias>;
+
+-- UNION
+WITH <CTE_1> AS (
+  SELECT <column_11>, <column_12>, ... 
+  FROM <table_1>
+),
+<CTE_2> AS (
+  SELECT <column_21>, <column_22>, ... 
+  FROM <table_2>
+)
+SELECT <column_11>, <column_12>, ... 
+FROM <CTE_1>
+UNION ALL
+SELECT <column_21>, <column_22>, ... 
+FROM <table_2>
+
+-- 视图,CTAS和插入语句中的CTE
+-- insert
+create table s1 like student;
+with q1 as ( select * from student where sno = 95002)
+from q1
+insert overwrite table s1
+select *;
+select * from s1;
+
+-- ctas
+create table s2 as
+with q1 as ( select * from student where sno = 95002)
+select * from q1;
+
+-- view
+create view v1 as
+with q1 as ( select * from student where sno = 95002)
+select * from q1;
+select * from v1;
+```
+
+### Left Semi Join
+
+相当于`INNER JOIN`只会返回左表的结果集
+
+在Hive中使用`JOIN`时,将大表放在最后可以提高传输效率
