@@ -1,6 +1,4 @@
-# 银行信贷数仓项目
-
-## 数据仓库 Data Warehouse
+# 数据仓库 Data Warehouse
 
 数仓是面向分析的集成化数据平台。  
 从各种数据来源收集数据，通过数仓进行数据加工分析，分析结果为企业提供决策依据
@@ -14,10 +12,8 @@
 - 避免数据库中进行分析影响性能，干扰业务开展
   - OLAP针对分析场景优化，支持快速聚合和大规模数据查询，避免干扰生产系统
 
-|  | `OLTP` | `OLAP` |
+|  | `OLTP`联机事务处理**On-Line Transaction Processing** | `OLAP`联机分析处理**On-Line Analysis Processing** |
 | - | - | - |
-|  | **On-Line Transaction Processing** | **On-Line Analysis Processing** |
-|  | 联机事务处理 | 联机分析处理 |
 | 用户 | 业务操作人员 | 数据分析师、业务分析师、决策人员 |
 | 目的 | 操作处理，支持基本业务运行 | 发现和分析问题，支持决策 |
 | 特点 | 处理大量的小业务 | 使用复杂查询处理大量数据 |
@@ -110,58 +106,4 @@
 - 提供直接查询接口
 - 数据展示友好
 
-### 数仓的技术选项
-
-数据源：Oracle数据库
-
-数据存储：GaussDB
-
-ETL工具：Kettle
-
-调度工具：Kettle
-
-## 数据字典
-
-### 客户表 CUSTOMERS
-
-客户表是OLTP系统核心表，支撑客户注册、信息查询等实时业务操作
-
-| 关键字段| 约束 | NULL | 描述 |
-| - | - | - | - |
-| CUSTOMER_ID | 主键 | FALSE ||
-| CUSTOMER_NAME || FALSE ||
-| AGE ||||
-| GENDER | M/F |||
-| CONTACT_NUMBER ||||
-| REGION_ID ||||
-| ADDRESS ||||
-| INCOME | >=0 |||
-| CREDIT_SCORE ||||
-
-### 信贷产品表 CREDIT_PRODUCTS
-
-信贷产品表是OLTP的系统核心表，支撑信贷产品的发布、参数配置及查询
-
-| 关键字段| 约束 | NULL | 描述 |
-| - | - | - | - |
-| PRODUCT_ID | 主键 | FALSE | 产品ID |
-| PRODUCT_NAME | 唯一 | FALSE | 产品名称 |
-| INTEREST_RATE | >=0 | FALSE | 年化利率,%,精确到0.00 |
-| LOAN_TERM | >=1 | FALSE | 贷款期限,月 |
-| MAX_LOAN_AMOUNT | >=0 | FALSE | 最高贷款额度 |
-
-### 贷款申请表 LOAN_APPLICATIONS
-
-贷款申请表是OLTP的系统核心表，支撑贷款申请、审批、状态更新等实时操作
-
-| 关键字段| 约束 | NULL | 描述 |
-| - | - | - | - |
-| APPLICATION_ID || FALSE | 申请ID |
-| CUSTOMER_ID | 关联`CUSTOMERS`表 | FALSE | 申请贷款的客户ID |
-| PRODUCT_ID | 关联`CREDIT_PRODUCTS`表 | FALSE | 客户申请的贷款产品ID |
-| APPLICATION_DATE || FALSE | 申请日期 |
-| LOAN_AMOUNT | >=0 | FALSE | 贷款金额 |
-| PURPOSE || TRUE | 贷款用途 |
-| APPLICATION_STATUS | LIST() |FALSE||
-
-### 审批记录表
+![Static Badge](https://img.shields.io/badge/TO_BE-COUTINUE-yellow)
