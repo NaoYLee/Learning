@@ -370,7 +370,7 @@ CREATE TABLE order_items (
 );
 ```
 
-### 查看表结构
+#### 查看表结构
 
 ```sql
 DESC [<database>.]<table>;
@@ -656,6 +656,389 @@ ORDER BY <column>;
   `DISTINCT` 会在这一步对结果进行去重
 7. `ORDER BY`  
   根据 `ORDER BY` 子句指定的列对结果进行排序,在最后进行,不会对性能产生太大影响
+
+#### 多表查询
+
+多表查询时表和字段都需要设置别名,使用 `<表别名>.<字段别名>` 表示数据具体表及字段
+
+##### 笛卡尔积
+
+**笛卡尔乘积**是指**两个集合的所有组合情况**  
+多表查询会产生大量无效的笛卡尔积,需要使用 `ON` 或 `WHERE` 来消除无效笛卡尔积
+
+##### 交叉连接
+
+仅介绍定义,生产环境**避免使用**交叉连接
+
+基本语法
+
+```sql
+SELECT * FROM <table_1> <alias_1>, <table_2> <alias_2>;
+```
+
+- 交叉连接不会消除笛卡尔积
+- 不需要任何连接条件,显式条件会导致语法错误
+- 包含所有行的组合,无论是否有实际关联
+- 生成所有可能的组合(如测试数据、全量矩阵)
+
+##### 内连接查询
+
+基本语法
+
+```sql
+-- 隐式内连接,不推荐
+SELECT * FROM <table_1> <alias_1>, <table_2> <alias_2> WHERE <expression>;
+
+-- 显式内连接
+SELECT * FROM <table_1> [INNER ]JOIN <table_2> ON <expression>;
+```
+
+内连接时正确使用 `ON` 关键词,结果集中不会产生新的 `NULL`
+
+示例
+
+```sql
+-- 标准写法
+SELECT
+    ow.id,
+    ow.name AS owner_name,
+    ot.NAME AS type_name 
+FROM owners ow
+INNER JOIN ownertype ot ON ow.ownertypeid = ot.id;
+
+-- 使用 WHERE 代替 ON,不推荐
+SELECT
+    ow.id,
+    ow.name AS owner_name,
+    ot.NAME AS type_name 
+FROM
+    owners ow,
+    ownertype ot
+WHERE ow.ownertypeid =ot.id;
+```
+
+###### 等值内连接
+
+```sql
+SELECT
+    ow.id,
+    ow.name AS owner_name,
+    ot.NAME AS type_name 
+FROM owners ow
+INNER JOIN ownertype ot ON ow.ownertypeid = ot.id;
+```
+
+###### 不等值内连接
+
+```sql
+SELECT
+    ow.id,
+    ow.name AS owner_name,
+    ot.NAME AS type_name 
+FROM owners ow
+INNER JOIN ownertype ot ON ow.id BETWEEN 10 AND 20;
+```
+
+##### 外连接查询
+
+###### 左外连接
+
+基本语法
+
+```sql
+SELECT
+    <column_1>,
+    <column_2>,
+    ...,
+    <column_n>
+FROM <table_1>
+LEFT [OUTER ]JOIN <table_2> ON <expression>;
+```
+
+- 使用 `LEFT JOIN` 左侧表中的每行数据,查找右侧表中满足 `<expression>` 的行
+  - 如果满足则结合两表数据输出一行
+  - 如果没有满足的行则右表对应字段产生 `NULL` 输出一行
+- 生产环境尽量使用行数多的表作为左表
+
+###### 右外连接
+
+基本语法
+
+```sql
+SELECT
+    <column_1>,
+    <column_2>,
+    ...,
+    <column_n>
+FROM <table_1>
+RIGHT [OUTER ]JOIN <table_2> ON <expression>;
+```
+
+- 使用 `RIGHT JOIN` 右侧表中的每行数据,查找左侧表中满足 `<expression>` 的行
+  - 如果满足则结合两表数据输出一行
+  - 如果没有满足的行则左表对应字段产生 `NULL` 输出一行
+- 生产环境尽量使用 `LEFT JOIN` 替换 `RIGHT JOIN`
+
+###### 全外连接
+
+基本语法
+
+```sql
+SELECT
+    <column_1>,
+    <column_2>,
+    ...,
+    <column_n>
+FROM <table_1>
+FULL [OUTER ]JOIN <table_2> ON <expression>;
+```
+
+- 使用 `FULL JOIN` 两侧表中的每行数据,查找对方表中满足 `<expression>` 的行
+  - 如果满足则结合两表数据输出一行
+  - 如果没有满足的行则对方表对应字段产生 `NULL` 输出一行
+- `FULL JOIN` 为 `LEFT JOIN` 与 `RIGHT JOIN` 结果的并集
+
+##### 自然连接
+
+在两张表中寻找数据类型和列名都相同的字段,然后自动地将他们连接起来,并返回所有符合条件的结果。
+
+基本语法
+
+```sql
+SELECT
+    <column_1>,
+    <column_2>,
+    ...,
+    <column_n>
+FROM <table_1>
+NATURAL JOIN <table_2>[ USING <column>];
+```
+
+#### 子查询
+
+子查询也称为嵌套查询,指在一个查询语句中嵌套另一个查询语句。  
+子查询通常被括在圆括号内,它可以出现在 SELECT、 FROM、 WHERE、 HAVING 等子句中。  
+子查询可以帮助用户更灵活地从数据库中获取所需的数据,实现一些复杂的查询逻辑。
+
+根据查询结果分类
+
+##### 标量子查询
+
+- 子查询结果为单个值(一行一列)
+- 多用于比较运算
+
+```sql
+SELECT <column_1>
+FROM <table_1>
+WHERE <expression_1> > (
+    SELECT <column_2>
+    FROM <table_2>
+    WHERE <expression_2>
+);
+```
+
+##### 列子查询
+
+- 子查询结果为一列
+- 多用于范围运算
+
+```sql
+SELECT <column_1>
+FROM <table_1>
+WHERE <expression_1> IN (
+    SELECT <column_2>
+    FROM <table_2>
+);
+```
+
+##### 行子查询
+
+- 子查询结果为一行
+- 多用于比较运算
+
+```sql
+SELECT <column_1>
+FROM <table_1>
+WHERE <expression_1> = (
+    SELECT <column_2>, <column_3>
+    FROM <table_2>
+    WHERE <expression_2>
+);
+```
+
+##### 表子查询
+
+- 子查询结果为多行多列
+- 多用于构建临时表
+
+```sql
+SELECT <column_1>
+FROM <table_1> <alias_1>
+LEFT JOIN (
+    SELECT <column_2>, <column_3>
+    FROM <table_2>
+    WHERE <expression_1>
+) <alias_2>
+WHERE <expression_2>;
+```
+
+| 比较运算符 | 功能 |
+| - | - |
+| `>` | 大于 |
+| `>=` | 大于等于 |
+| `<` | 小于 |
+| `<=` | 小于等于 |
+| `<>` / `!=` | 不等于 |
+| `<=>` | 严格比较,可以避免 `NULL` 的影响 |
+
+| 范围运算符 | 功能 |
+| - | - |
+| `IN` | 在子查询返回值内 |
+| `NOT IN` | 不在子查询返回值内 |
+| `ANY` | 与子查询返回值中任意一项比较 |
+| `ALL` | 与子查询返回值中所有项比较 |
+
+根据查询顺序分类
+
+- 关联子查询
+  - 子查询不能作为一段独立的代码单独运行,必须借助外部SELECT查询才能执行
+  - 先执行外部查询再执行内部子查询
+- 非关联子查询
+  - 子查询能够作为一段独立的代码单独运行
+  - 先执行子查询,然后根据子查询的结果执行外部查询
+
+#### 分页查询
+
+##### 基于伪列的查询
+
+`ROWID`
+
+- 使用 `ROWID` 值可以标识表中唯一的一行;
+- 表中的每一行在数据文件中都有一个物理地址,`ROWID` 返回的就是该行的物理地址,由于 `ROWID` 返回的是该行的物理地址,因此使用 `ROWID` 可以显示行是如何存储的;
+- `ROWID` 的值是由大小写字母组成,表示该条数据位于硬盘中的存储地址,系统在查询表中数据时,就是依靠 `ROWID` 字段的地址进行查询;
+- 每一条数据的 `ROWID` 都不为空;
+- 每一条数据的 `ROWID` 都不相同,如果 `ROWID` 相同则证明是同一条数据;
+- `ROWID` 一般用于删除重复数据。
+
+```sql
+DELETE FROM <table>
+WHERE NOT ROWID IN (
+  SELECT MIN(rowid)
+  FROM <table>
+  GROUP BY <column_1>, <column_2>
+);
+```
+
+`ROWNUM`
+
+- 在查询的结果集中,`ROWNUM` 为结果集中每行的标识行号,第一行返回1,第二行返回2,以此类推;
+- 通过 `ROWNUM` 伪列可以限制查询结果集中返回的行数;
+- `ROWNUM` 是逐行扫描表中每条记录时产生,每扫描到一行, `ROWNUM` 就赋予一个行号,所以不能使用 `>` 或 `>=` 符号,只能使用 `<` 或 `<=`。
+
+```sql
+SELECT
+    ROWNUM,
+    <alias>.*
+FROM <table> <alias>
+ORDER BY <column_1>, <column_2>
+WHERE ROWNUM < <number>;
+
+-- 查询 `ROWNUM` 大于指定值的方式
+SELECT * 
+FROM (
+    SELECT
+        ROWNUM AS rn,
+        <column>
+    FROM <table> <alias>
+    WHERE ROWNUM <= <number_1>
+) WHERE rn > <number_2>;  -- 在进行本步时已经查询出表<table>的 `ROWNUM`
+
+-- Oracle分页查询代码
+SELECT * 
+FROM (
+    SELECT
+        ROWNUM AS rn,
+        <alias>.* 
+    FROM (
+        SELECT * 
+        FROM <table>
+        ORDER BY <column_> desc
+    ) <alias>
+    WHERE ROWNUM <= <number_1> -- 选择本页要展示的最后一条
+) WHERE rn > <number_2>;  -- 选择本页要展示的第一条
+```
+
+#### 集合运算
+
+- `UNION ALL` 并集
+  - 返回来自任一查询所有行,包括重复行
+- `UNION` 并集
+  - 返回来自任一查询的所有唯一行
+- `INTERSECT` 交集
+  - 返回同时存在于两个查询中的所有唯一行
+- `MINUS` 差集
+  - 返回存在于第一个查询但不存在于第二个查询的所有唯一行
+
+基本语法
+
+```sql
+SELECT *
+FROM <table_1>
+WHERE <expression_1>
+<set_operation>
+SELECT *
+FROM <table_2>
+WHERE <expression_2>
+```
+
+在 Oracle 数据库中**进行集合运算需要满足以下条件**
+
+- 结果集的列数必须相同：
+  - 第一个 `SELECT` 语句选择的列数必须与第二个 `SELECT` 语句选择的列数相同,如果有第三个、第四个 `SELECT` 语句的列数也必须相同
+- 对应列的数据类型必须兼容：
+  - 两个结果集中对应位置的列(即第一列对第一列,第二列对第二列,依此类推)的数据类型必须是 Oracle 可以隐式转换的,或者是相同的数据类型族
+  - 常见的兼容情况
+    - `NUMBER` 与 `NUMBER` (各种精度/标度)
+    - `VARCHAR2` 与 `CHAR` (以及 `NVARCHAR2`, `NCHAR`)
+    - `DATE` 与 `TIMESTAMP` (Oracle 通常会隐式转换 `DATE` 为 `TIMESTAMP`)
+    - `CLOB` 与 `VARCHAR2` (在某些上下文中有隐式转换,但通常不建议直接集合运算,最好显式转换)
+    - `BLOB` 与 `BLOB` (相同类型)
+  - 不兼容的示例
+    - `VARCHAR2` 与 `NUMBER` (除非字符串内容完全是数字且 Oracle 能隐式转换,但强烈不建议依赖隐式转换,应显式转换)
+    - `DATE` 与 `VARCHAR2` (除非字符串是有效日期格式且能隐式转换,同样不建议)
+- 列名和别名：
+  - 结果集的列名不需要相同
+  - 最终结果集的列名取自第一个 `SELECT` 语句中的列名或别名
+
+- `ORDER BY` 子句的位置
+  - `ORDER BY` 子句只能出现在整个集合运算语句的最后
+  - 只能使用第一个 `SELECT` 语句中的列名、别名或位置编号
+  - 它用于对整个集合运算后的最终结果集进行排序
+  - 不能在单个 `SELECT` 语句后面放置 `ORDER BY` (除非该 `SELECT` 是子查询的一部分)。例如：
+
+```sql
+-- 错误
+SELECT emp_id FROM emp UNION SELECT dept_id FROM dept ORDER BY dept_id; 
+-- 如果 dept_id 不是第一个 SELECT 的列名/别名
+
+-- 正确
+SELECT emp_id AS id FROM emp UNION SELECT dept_id AS id FROM dept ORDER BY id;
+-- 使用别名
+
+-- 正确
+SELECT emp_id FROM emp UNION SELECT dept_id FROM dept ORDER BY 1; 
+-- 使用位置编号
+```
+
+- 数据类型转换(可选但推荐)：
+  - 如果对应列的数据类型不完全相同但兼容,Oracle 会尝试隐式转换。
+  - 为了避免潜在的隐式转换错误或性能问题,强烈建议在 SELECT 列表中使用 CAST 或 TO_CHAR, TO_NUMBER, TO_DATE 等函数进行显式转换,确保对应列具有完全相同或高度兼容的目标类型。例如：
+
+```sql
+SELECT TO_CHAR(employee_id) AS id, hire_date FROM employees
+UNION
+SELECT department_id, TO_DATE(NULL) FROM departments; -- 假设 departments 没有日期列,用 NULL 占位并转换为 DATE
+```
 
 ### DCL data control language
 
@@ -971,566 +1354,6 @@ SUBPARTITION BY LIST (job) (   -- 再按照职位进行列表分区
 
 尽量手动指定查询分区，提高查询效率
 
-## 数据库使用
-
-### 三范式
-
-三范式是数据库逻辑设计的关键方法,其目的是**对数据结构进行优化**,**降低数据冗余**,**增强数据一致性和完整性**。  
-在逻辑设计阶段,按三范式的指导把概念模型转换为具体的数据库表结构。
-
-**三范式的作用**  
-
-1. 避免重复数据  
-  避免同一信息在多表中重复存储
-2. 减少错误操作  
-  修改数据时只需要在一张表中修改
-3. 提升查询效率  
-  表结构清晰,提高可读性
-4. 防止数据矛盾  
-  避免数据更新不同步产生矛盾
-
-#### 第一范式：原子性,不可拆分
-
-- 每个字段的值必须是"最小单位",不能再拆分
-- 错误示例：
-  - 问题："地址"中包含省、市、区、街道等,混在一起,无法单独查询
-
-| 学生 | 住址 |
-| - | - |
-| 张三 | 浙江省杭州市钱塘区11号大街469号1幢4楼 |
-
-- 正确设计：
-
-| 学生 | 住址 | 城市 | 区县 | 街道 | 详细地址 |
-| - | - | - | - | - | - |
-| 张三 | 浙江省 | 杭州市 | 钱塘区 | 11号大街 | 469号1幢4楼 |
-
-#### 第二范式：消除部分依赖
-
-- 表必须有唯一标识(主键),且其他字段必须完全依赖主键,不能只依赖主键的一部分
-- 错误示例(学生成绩表)：
-  - 问题：
-    - "学生姓名"只依赖"学号",和"课程"无关
-    - "课程老师"只依赖"课程",和"学号"无关
-
-| 学号 | 课程 | 成绩 | 学生姓名 | 任课教师 |
-| - | - | - | - | - |
-| 001 | 数学 | 90 | 张三 | 王老师 |
-
-- 正确设计：
-
-学生表
-
-| 学号 | 学生姓名 |
-| - | - |
-| 001 | 张三 |
-
-课程表
-
-| 课程 | 任课教师 |
-| - | - |
-| 数学 | 王老师 |
-
-成绩表
-
-| 学号 | 课程 | 成绩 |
-| - | - | - |
-| 001 | 数学 | 90 |
-
-#### 第三范式：消除传递依赖
-
-- 表中的字段不能依赖其他非主键字段,只能直接依赖主键
-- 错误示例(订单表)：
-  - 问题："用户名"和"用户等级"依赖"用户ID",而"用户ID"依赖主键"订单号"
-
-| 订单号(主键) | 用户ID | 用户名 | 用户等级 | 订单金额 |
-| - | - | - | - | - |
-| 1001 | 001 | 张三 | VIP | 500 |
-
-- 正确设计：
-
-订单表
-
-| 订单号 | 用户ID | 订单金额 |
-| - | - | - |
-| 1001 | 001 | 500 |
-
-用户表
-
-| 用户ID | 用户名 | 用户等级 |
-| - | - | - |
-| 001 | 张三 | VIP |
-
-#### 反三范式
-
-三范式可能导致：  
-> 1.查询变慢,需要频繁联表查询  
-> 2.开发复杂,要处理多表关联,容易出错  
-> 3.性能瓶颈,高并发场景下,联表操作可能拖垮数据库
-
-反三范式适合的场景:  
-> 1.读多写少的系统  
-> 2.对查询速度要求极高的场景。  
-> 3.数据量极大,联表查询成本过高。
-
-| 优点 | 缺点 |
-| - | - |
-| 查询速度大幅提升 | 数据冗余占用存储空间 |
-| 简化SQL复杂度 | 数据更新成本高 |
-| 减少联表操作压力 | 需要额外维护数据一致性 |
-
-反三范式注意事项：  
-> 1.明确场景,只有读频率远远大于写频率的场景才适合反三范式  
-> 2.数据一致性,用触发器、事务或定时任务同步冗余数据,避免脏数据  
-> 3.文档注释,在表结构设计中注明冗余字段的作用和同步机制  
-> 4.如果存储空间紧张,或数据频繁修改,优先遵循三范式
-
-### 视图
-
-视图 `VIEW` 是封装SQL结果集的虚拟表。
-
-视图的作用：
-
-1. 简化复杂查询  
-  可以将语句复杂的SQL封装为视图,之后只需要查视图而不必重复使用语句
-2. 保护数据安全  
-  可以通过视图隐藏基表中的敏感列或敏感行,用户只能访问视图无法访问基表
-3. 复用常用查询  
-  将常用查询封装为视图
-
-基本语法
-
-```sql
---创建视图
-CREATE [OR REPALCE] [FORCE] VIEW <view>
-AS <SQL>
-[WHERE <expression> WITH CHECK OPTION]
-[WITH READ ONLY]
-
--- 删除试图
-DROP VIEW <view>;
-```
-
-`[OR REPALCE]` 若创建的视图已存在,自动重建该视图
-`[FORCE]` 忽略基表是否存在,强制建立视图
-`<SQL>` 一条完整的SQL语句
-`[WITH CHECK OPTION]` 插入或新建数据必须满足约束要求
-`[WITH READ ONLY]` 只读视图
-
-### 多表关系
-
-多表关系基本上可以分为三种：
-
-1. 一对一
-2. 一对多
-3. 多对多
-
-"一"、"多"指的都是字段中行数量
-
-#### 一对一
-
-一对一关系表在实际开发中通常是用来做单表的拆分,也就是将一张大表拆分成两张小表。将大表中的一些基础字段放在一张表当中,将其他的字段放在另外一张表当中,以此来提高数据的操作效率。  
-一对一的实现：  
-
-1. 在任意一方的表中新增一个字段(叫外键),关联另外一方的主键字段,并且给外键字段设置唯一约束(UNIQUE)。
-
-#### 一对多
-
-概念：一边是"1个",另一边是"多个"。比如：一个班级有多个学生。  
-一对多的实现：
-
-1. 在"多"的表里,增加一个外键字段,指向"一"的表的主键字段。
-
-#### 多对多
-
-多对多的实现：
-
-1. 把复杂的多对多关系拆分为两个一对多关系
-2. 建立第三张中间表,中间表至少包含两个外键,分别关联两方主键
-
-### 多表查询
-
-多表查询时表和字段都需要设置别名,使用 `<表别名>.<字段别名>` 表示数据具体表及字段
-
-#### 笛卡尔积
-
-**笛卡尔乘积**是指**两个集合的所有组合情况**  
-多表查询会产生大量无效的笛卡尔积,需要使用 `ON` 或 `WHERE` 来消除无效笛卡尔积
-
-#### 交叉连接
-
-仅介绍定义,生产环境**避免使用**交叉连接
-
-基本语法
-
-```sql
-SELECT * FROM <table_1> <alias_1>, <table_2> <alias_2>;
-```
-
-- 交叉连接不会消除笛卡尔积
-- 不需要任何连接条件,显式条件会导致语法错误
-- 包含所有行的组合,无论是否有实际关联
-- 生成所有可能的组合(如测试数据、全量矩阵)
-
-#### 内连接查询
-
-基本语法
-
-```sql
--- 隐式内连接,不推荐
-SELECT * FROM <table_1> <alias_1>, <table_2> <alias_2> WHERE <expression>;
-
--- 显式内连接
-SELECT * FROM <table_1> [INNER ]JOIN <table_2> ON <expression>;
-```
-
-内连接时正确使用 `ON` 关键词,结果集中不会产生新的 `NULL`
-
-示例
-
-```sql
--- 标准写法
-SELECT
-    ow.id,
-    ow.name AS owner_name,
-    ot.NAME AS type_name 
-FROM owners ow
-INNER JOIN ownertype ot ON ow.ownertypeid = ot.id;
-
--- 使用 WHERE 代替 ON,不推荐
-SELECT
-    ow.id,
-    ow.name AS owner_name,
-    ot.NAME AS type_name 
-FROM
-    owners ow,
-    ownertype ot
-WHERE ow.ownertypeid =ot.id;
-```
-
-##### 等值内连接
-
-```sql
-SELECT
-    ow.id,
-    ow.name AS owner_name,
-    ot.NAME AS type_name 
-FROM owners ow
-INNER JOIN ownertype ot ON ow.ownertypeid = ot.id;
-```
-
-##### 不等值内连接
-
-```sql
-SELECT
-    ow.id,
-    ow.name AS owner_name,
-    ot.NAME AS type_name 
-FROM owners ow
-INNER JOIN ownertype ot ON ow.id BETWEEN 10 AND 20;
-```
-
-#### 外连接查询
-
-##### 左外连接
-
-基本语法
-
-```sql
-SELECT
-    <column_1>,
-    <column_2>,
-    ...,
-    <column_n>
-FROM <table_1>
-LEFT [OUTER ]JOIN <table_2> ON <expression>;
-```
-
-- 使用 `LEFT JOIN` 左侧表中的每行数据,查找右侧表中满足 `<expression>` 的行
-  - 如果满足则结合两表数据输出一行
-  - 如果没有满足的行则右表对应字段产生 `NULL` 输出一行
-- 生产环境尽量使用行数多的表作为左表
-
-##### 右外连接
-
-基本语法
-
-```sql
-SELECT
-    <column_1>,
-    <column_2>,
-    ...,
-    <column_n>
-FROM <table_1>
-RIGHT [OUTER ]JOIN <table_2> ON <expression>;
-```
-
-- 使用 `RIGHT JOIN` 右侧表中的每行数据,查找左侧表中满足 `<expression>` 的行
-  - 如果满足则结合两表数据输出一行
-  - 如果没有满足的行则左表对应字段产生 `NULL` 输出一行
-- 生产环境尽量使用 `LEFT JOIN` 替换 `RIGHT JOIN`
-
-##### 全外连接
-
-基本语法
-
-```sql
-SELECT
-    <column_1>,
-    <column_2>,
-    ...,
-    <column_n>
-FROM <table_1>
-FULL [OUTER ]JOIN <table_2> ON <expression>;
-```
-
-- 使用 `FULL JOIN` 两侧表中的每行数据,查找对方表中满足 `<expression>` 的行
-  - 如果满足则结合两表数据输出一行
-  - 如果没有满足的行则对方表对应字段产生 `NULL` 输出一行
-- `FULL JOIN` 为 `LEFT JOIN` 与 `RIGHT JOIN` 结果的并集
-
-#### 自然连接
-
-在两张表中寻找数据类型和列名都相同的字段,然后自动地将他们连接起来,并返回所有符合条件的结果。
-
-基本语法
-
-```sql
-SELECT
-    <column_1>,
-    <column_2>,
-    ...,
-    <column_n>
-FROM <table_1>
-NATURAL JOIN <table_2>[ USING <column>];
-```
-
-### 子查询
-
-子查询也称为嵌套查询,指在一个查询语句中嵌套另一个查询语句。  
-子查询通常被括在圆括号内,它可以出现在 SELECT、 FROM、 WHERE、 HAVING 等子句中。  
-子查询可以帮助用户更灵活地从数据库中获取所需的数据,实现一些复杂的查询逻辑。
-
-根据查询结果分类
-
-#### 标量子查询
-
-- 子查询结果为单个值(一行一列)
-- 多用于比较运算
-
-```sql
-SELECT <column_1>
-FROM <table_1>
-WHERE <expression_1> > (
-    SELECT <column_2>
-    FROM <table_2>
-    WHERE <expression_2>
-);
-```
-
-#### 列子查询
-
-- 子查询结果为一列
-- 多用于范围运算
-
-```sql
-SELECT <column_1>
-FROM <table_1>
-WHERE <expression_1> IN (
-    SELECT <column_2>
-    FROM <table_2>
-);
-```
-
-#### 行子查询
-
-- 子查询结果为一行
-- 多用于比较运算
-
-```sql
-SELECT <column_1>
-FROM <table_1>
-WHERE <expression_1> = (
-    SELECT <column_2>, <column_3>
-    FROM <table_2>
-    WHERE <expression_2>
-);
-```
-
-#### 表子查询
-
-- 子查询结果为多行多列
-- 多用于构建临时表
-
-```sql
-SELECT <column_1>
-FROM <table_1> <alias_1>
-LEFT JOIN (
-    SELECT <column_2>, <column_3>
-    FROM <table_2>
-    WHERE <expression_1>
-) <alias_2>
-WHERE <expression_2>;
-```
-
-| 比较运算符 | 功能 |
-| - | - |
-| `>` | 大于 |
-| `>=` | 大于等于 |
-| `<` | 小于 |
-| `<=` | 小于等于 |
-| `<>` / `!=` | 不等于 |
-| `<=>` | 严格比较,可以避免 `NULL` 的影响 |
-
-| 范围运算符 | 功能 |
-| - | - |
-| `IN` | 在子查询返回值内 |
-| `NOT IN` | 不在子查询返回值内 |
-| `ANY` | 与子查询返回值中任意一项比较 |
-| `ALL` | 与子查询返回值中所有项比较 |
-
-根据查询顺序分类
-
-- 关联子查询
-  - 子查询不能作为一段独立的代码单独运行,必须借助外部SELECT查询才能执行
-  - 先执行外部查询再执行内部子查询
-- 非关联子查询
-  - 子查询能够作为一段独立的代码单独运行
-  - 先执行子查询,然后根据子查询的结果执行外部查询
-
-### 分页查询
-
-#### 基于伪列的查询
-
-`ROWID`
-
-- 使用 `ROWID` 值可以标识表中唯一的一行;
-- 表中的每一行在数据文件中都有一个物理地址,`ROWID` 返回的就是该行的物理地址,由于 `ROWID` 返回的是该行的物理地址,因此使用 `ROWID` 可以显示行是如何存储的;
-- `ROWID` 的值是由大小写字母组成,表示该条数据位于硬盘中的存储地址,系统在查询表中数据时,就是依靠 `ROWID` 字段的地址进行查询;
-- 每一条数据的 `ROWID` 都不为空;
-- 每一条数据的 `ROWID` 都不相同,如果 `ROWID` 相同则证明是同一条数据;
-- `ROWID` 一般用于删除重复数据。
-
-```sql
-DELETE FROM <table>
-WHERE NOT ROWID IN (
-  SELECT MIN(rowid)
-  FROM <table>
-  GROUP BY <column_1>, <column_2>
-);
-```
-
-`ROWNUM`
-
-- 在查询的结果集中,`ROWNUM` 为结果集中每行的标识行号,第一行返回1,第二行返回2,以此类推;
-- 通过 `ROWNUM` 伪列可以限制查询结果集中返回的行数;
-- `ROWNUM` 是逐行扫描表中每条记录时产生,每扫描到一行, `ROWNUM` 就赋予一个行号,所以不能使用 `>` 或 `>=` 符号,只能使用 `<` 或 `<=`。
-
-```sql
-SELECT
-    ROWNUM,
-    <alias>.*
-FROM <table> <alias>
-ORDER BY <column_1>, <column_2>
-WHERE ROWNUM < <number>;
-
--- 查询 `ROWNUM` 大于指定值的方式
-SELECT * 
-FROM (
-    SELECT
-        ROWNUM AS rn,
-        <column>
-    FROM <table> <alias>
-    WHERE ROWNUM <= <number_1>
-) WHERE rn > <number_2>;  -- 在进行本步时已经查询出表<table>的 `ROWNUM`
-
--- Oracle分页查询代码
-SELECT * 
-FROM (
-    SELECT
-        ROWNUM AS rn,
-        <alias>.* 
-    FROM (
-        SELECT * 
-        FROM <table>
-        ORDER BY <column_> desc
-    ) <alias>
-    WHERE ROWNUM <= <number_1> -- 选择本页要展示的最后一条
-) WHERE rn > <number_2>;  -- 选择本页要展示的第一条
-```
-
-### 集合运算
-
-- `UNION ALL` 并集
-  - 返回来自任一查询所有行,包括重复行
-- `UNION` 并集
-  - 返回来自任一查询的所有唯一行
-- `INTERSECT` 交集
-  - 返回同时存在于两个查询中的所有唯一行
-- `MINUS` 差集
-  - 返回存在于第一个查询但不存在于第二个查询的所有唯一行
-
-基本语法
-
-```sql
-SELECT *
-FROM <table_1>
-WHERE <expression_1>
-<set_operation>
-SELECT *
-FROM <table_2>
-WHERE <expression_2>
-```
-
-在 Oracle 数据库中**进行集合运算需要满足以下条件**
-
-- 结果集的列数必须相同：
-  - 第一个 `SELECT` 语句选择的列数必须与第二个 `SELECT` 语句选择的列数相同,如果有第三个、第四个 `SELECT` 语句的列数也必须相同
-- 对应列的数据类型必须兼容：
-  - 两个结果集中对应位置的列(即第一列对第一列,第二列对第二列,依此类推)的数据类型必须是 Oracle 可以隐式转换的,或者是相同的数据类型族
-  - 常见的兼容情况
-    - `NUMBER` 与 `NUMBER` (各种精度/标度)
-    - `VARCHAR2` 与 `CHAR` (以及 `NVARCHAR2`, `NCHAR`)
-    - `DATE` 与 `TIMESTAMP` (Oracle 通常会隐式转换 `DATE` 为 `TIMESTAMP`)
-    - `CLOB` 与 `VARCHAR2` (在某些上下文中有隐式转换,但通常不建议直接集合运算,最好显式转换)
-    - `BLOB` 与 `BLOB` (相同类型)
-  - 不兼容的示例
-    - `VARCHAR2` 与 `NUMBER` (除非字符串内容完全是数字且 Oracle 能隐式转换,但强烈不建议依赖隐式转换,应显式转换)
-    - `DATE` 与 `VARCHAR2` (除非字符串是有效日期格式且能隐式转换,同样不建议)
-- 列名和别名：
-  - 结果集的列名不需要相同
-  - 最终结果集的列名取自第一个 `SELECT` 语句中的列名或别名
-
-- `ORDER BY` 子句的位置
-  - `ORDER BY` 子句只能出现在整个集合运算语句的最后
-  - 只能使用第一个 `SELECT` 语句中的列名、别名或位置编号
-  - 它用于对整个集合运算后的最终结果集进行排序
-  - 不能在单个 `SELECT` 语句后面放置 `ORDER BY` (除非该 `SELECT` 是子查询的一部分)。例如：
-
-```sql
--- 错误
-SELECT emp_id FROM emp UNION SELECT dept_id FROM dept ORDER BY dept_id; 
--- 如果 dept_id 不是第一个 SELECT 的列名/别名
-
--- 正确
-SELECT emp_id AS id FROM emp UNION SELECT dept_id AS id FROM dept ORDER BY id;
--- 使用别名
-
--- 正确
-SELECT emp_id FROM emp UNION SELECT dept_id FROM dept ORDER BY 1; 
--- 使用位置编号
-```
-
-- 数据类型转换(可选但推荐)：
-  - 如果对应列的数据类型不完全相同但兼容,Oracle 会尝试隐式转换。
-  - 为了避免潜在的隐式转换错误或性能问题,强烈建议在 SELECT 列表中使用 CAST 或 TO_CHAR, TO_NUMBER, TO_DATE 等函数进行显式转换,确保对应列具有完全相同或高度兼容的目标类型。例如：
-
-```sql
-SELECT TO_CHAR(employee_id) AS id, hire_date FROM employees
-UNION
-SELECT department_id, TO_DATE(NULL) FROM departments; -- 假设 departments 没有日期列,用 NULL 占位并转换为 DATE
-```
-
 ### 行列转换
 
 数据库的行列转换是一个抽象概念,指的是改变数据在结果集中呈现的方式,通常涉及将行中的数据值动态地变成新的列,或者将列中的数据值变成新的行,不等同于单纯的数学上的“**转置**”。
@@ -1699,6 +1522,183 @@ LEAD(<column_1>,<offset>,[<default_value>]) OVER (
 - `[<default_value>]` 当偏移位置超出结果集范围时返回的值,未设置时默认返回 `NULL`
 - `[PARTITION BY <column_2>]` 按照 `<column_2>` 中内容进行分组查询
 - `ORDER BY <column_3>` 将结果集按照 `<column_3>` 中内容进行排序
+
+### 视图
+
+视图 `VIEW` 是封装SQL结果集的虚拟表。
+
+视图的作用：
+
+1. 简化复杂查询  
+  可以将语句复杂的SQL封装为视图,之后只需要查视图而不必重复使用语句
+2. 保护数据安全  
+  可以通过视图隐藏基表中的敏感列或敏感行,用户只能访问视图无法访问基表
+3. 复用常用查询  
+  将常用查询封装为视图
+
+基本语法
+
+```sql
+--创建视图
+CREATE [OR REPALCE] [FORCE] VIEW <view>
+AS <SQL>
+[WHERE <expression> WITH CHECK OPTION]
+[WITH READ ONLY]
+
+-- 删除试图
+DROP VIEW <view>;
+```
+
+`[OR REPALCE]` 若创建的视图已存在,自动重建该视图
+`[FORCE]` 忽略基表是否存在,强制建立视图
+`<SQL>` 一条完整的SQL语句
+`[WITH CHECK OPTION]` 插入或新建数据必须满足约束要求
+`[WITH READ ONLY]` 只读视图
+
+## 数据库使用
+
+### 三范式
+
+三范式是数据库逻辑设计的关键方法,其目的是**对数据结构进行优化**,**降低数据冗余**,**增强数据一致性和完整性**。  
+在逻辑设计阶段,按三范式的指导把概念模型转换为具体的数据库表结构。
+
+**三范式的作用**  
+
+1. 避免重复数据  
+  避免同一信息在多表中重复存储
+2. 减少错误操作  
+  修改数据时只需要在一张表中修改
+3. 提升查询效率  
+  表结构清晰,提高可读性
+4. 防止数据矛盾  
+  避免数据更新不同步产生矛盾
+
+#### 第一范式：原子性,不可拆分
+
+- 每个字段的值必须是"最小单位",不能再拆分
+- 错误示例：
+  - 问题："地址"中包含省、市、区、街道等,混在一起,无法单独查询
+
+| 学生 | 住址 |
+| - | - |
+| 张三 | 浙江省杭州市钱塘区11号大街469号1幢4楼 |
+
+- 正确设计：
+
+| 学生 | 住址 | 城市 | 区县 | 街道 | 详细地址 |
+| - | - | - | - | - | - |
+| 张三 | 浙江省 | 杭州市 | 钱塘区 | 11号大街 | 469号1幢4楼 |
+
+#### 第二范式：消除部分依赖
+
+- 表必须有唯一标识(主键),且其他字段必须完全依赖主键,不能只依赖主键的一部分
+- 错误示例(学生成绩表)：
+  - 问题：
+    - "学生姓名"只依赖"学号",和"课程"无关
+    - "课程老师"只依赖"课程",和"学号"无关
+
+| 学号 | 课程 | 成绩 | 学生姓名 | 任课教师 |
+| - | - | - | - | - |
+| 001 | 数学 | 90 | 张三 | 王老师 |
+
+- 正确设计：
+
+学生表
+
+| 学号 | 学生姓名 |
+| - | - |
+| 001 | 张三 |
+
+课程表
+
+| 课程 | 任课教师 |
+| - | - |
+| 数学 | 王老师 |
+
+成绩表
+
+| 学号 | 课程 | 成绩 |
+| - | - | - |
+| 001 | 数学 | 90 |
+
+#### 第三范式：消除传递依赖
+
+- 表中的字段不能依赖其他非主键字段,只能直接依赖主键
+- 错误示例(订单表)：
+  - 问题："用户名"和"用户等级"依赖"用户ID",而"用户ID"依赖主键"订单号"
+
+| 订单号(主键) | 用户ID | 用户名 | 用户等级 | 订单金额 |
+| - | - | - | - | - |
+| 1001 | 001 | 张三 | VIP | 500 |
+
+- 正确设计：
+
+订单表
+
+| 订单号 | 用户ID | 订单金额 |
+| - | - | - |
+| 1001 | 001 | 500 |
+
+用户表
+
+| 用户ID | 用户名 | 用户等级 |
+| - | - | - |
+| 001 | 张三 | VIP |
+
+#### 反三范式
+
+三范式可能导致：  
+> 1.查询变慢,需要频繁联表查询  
+> 2.开发复杂,要处理多表关联,容易出错  
+> 3.性能瓶颈,高并发场景下,联表操作可能拖垮数据库
+
+反三范式适合的场景:  
+> 1.读多写少的系统  
+> 2.对查询速度要求极高的场景。  
+> 3.数据量极大,联表查询成本过高。
+
+| 优点 | 缺点 |
+| - | - |
+| 查询速度大幅提升 | 数据冗余占用存储空间 |
+| 简化SQL复杂度 | 数据更新成本高 |
+| 减少联表操作压力 | 需要额外维护数据一致性 |
+
+反三范式注意事项：  
+> 1.明确场景,只有读频率远远大于写频率的场景才适合反三范式  
+> 2.数据一致性,用触发器、事务或定时任务同步冗余数据,避免脏数据  
+> 3.文档注释,在表结构设计中注明冗余字段的作用和同步机制  
+> 4.如果存储空间紧张,或数据频繁修改,优先遵循三范式
+
+### 多表关系
+
+多表关系基本上可以分为三种：
+
+1. 一对一
+2. 一对多
+3. 多对多
+
+"一"、"多"指的都是字段中行数量
+
+#### 一对一
+
+一对一关系表在实际开发中通常是用来做单表的拆分,也就是将一张大表拆分成两张小表。将大表中的一些基础字段放在一张表当中,将其他的字段放在另外一张表当中,以此来提高数据的操作效率。  
+一对一的实现：  
+
+1. 在任意一方的表中新增一个字段(叫外键),关联另外一方的主键字段,并且给外键字段设置唯一约束(UNIQUE)。
+
+#### 一对多
+
+概念：一边是"1个",另一边是"多个"。比如：一个班级有多个学生。  
+一对多的实现：
+
+1. 在"多"的表里,增加一个外键字段,指向"一"的表的主键字段。
+
+#### 多对多
+
+多对多的实现：
+
+1. 把复杂的多对多关系拆分为两个一对多关系
+2. 建立第三张中间表,中间表至少包含两个外键,分别关联两方主键
 
 ### 索引
 
@@ -1948,7 +1948,7 @@ Plan hash value: 2949544139
 
 #### 事务的生命周期
 
-在Oracle数据库中,执行第一条DML开始,到 `COMMIT` 或 `ROLLBACK` 为止,为一个事务的生命周期  
+在数据库中,执行第一条DML开始,到 `COMMIT` 或 `ROLLBACK` 为止,为一个事务的生命周期  
 DDL自动提交
 
 ### 数据字典
