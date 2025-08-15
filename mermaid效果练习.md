@@ -37,10 +37,14 @@ graph TD
 
 ```mermaid
 sequenceDiagram
-    Alice->Bob: Hello
-    Bob->>Charlie: Nihao
-    Charlie-->David: Ohla
-    David-->>Alice: Guten Tag
+    Alice ->+ Bob: Hello
+    Alice ->+ David: Hello
+    Bob ->>+ Charlie: Nihao
+    Bob ->>- Alice:Nihao
+    Charlie -->- Bob: Ohla
+    Charlie -->+ David: Ohla
+    David -->>- Alice: Guten Tag
+    David -->>- Charlie: Guten Tag
 ```
 
 ## gantt

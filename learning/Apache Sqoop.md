@@ -1,9 +1,9 @@
 # Apache Sqoop
 
-Sqoop是一款主要用于在Hadoop生态体系和RDBMS体系之间传送数据的一种工具,可以理解为："SQL到Hadoop"和"Hadoop到SQL"
+![Static Badge](https://img.shields.io/badge/%E4%BB%85%E4%BE%9B%E5%8F%82%E8%80%83-red)  
+本笔记仅通过常用行为演示各指令及参数使用方法,**具体参数使用依实际需求决定**  
 
-> 导入(import)：指的数据从关系型数据库传输到Hadoop生态体系  
-> 导出(export)：指的数据从Hadoop生态体系传输到关系型数据
+Sqoop是一款主要用于在Hadoop生态体系和RDBMS体系之间传送数据的一种工具,可以理解为："SQL到Hadoop"和"Hadoop到SQL"
 
 Sqoop通过解析传递的参数,将这些参数传递给底层的MapReduce模板来运行  
 所有Sqoop的MapReduce程序只有Map过程,没有Reduce过程,因为数据迁移过程通常不需要聚合操作
@@ -37,6 +37,7 @@ sqoop import \
 [--verbose \]
 ```
 
+`sqoop import` 将数据从关系型数据库传输到Hadoop生态体系
 `--table` 目标表  
 `--delete-target-dir` 导入HDFS目标路径若存在提前删除  
 `--target-dir` 导入HDFS目标路径  
@@ -161,6 +162,7 @@ sqoop import \
 ```
 
 `--hive-import` 向Hive中导入数据
+`--hive-table` 用于指定Hive中表名,不指定时按`--table`参数表名创建新表
 
 ### 增量数据导入
 
@@ -224,6 +226,7 @@ sqoop export \
 --export-dir <HDFS_path>
 ```
 
+`sqoop export` 将的数据从Hadoop生态体系传输到关系型数据
 `--input-fields-terminated-by` 指定字段之间的分隔符  
 `--input-lines-terminated-by` 指定行之间的分隔符  
 `--columns` 选择导出字段并设置顺序
