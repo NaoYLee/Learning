@@ -31,6 +31,7 @@ print(f'我叫{name}, 我的年龄是{age}, 我的工资是{salary}')
 
 # 保留小数位
 print(f'我叫{name}, 我的年龄是{age}, 我的工资是{round(salary, 2)}')
+print(f'我叫{name}, 我的年龄是{age}, 我的工资是{salary:.2f}')
 
 # 转义%
 count = 3
@@ -42,7 +43,6 @@ print(f'我叫{name}, 我的成绩是班级的前{count}%')
 
 print('Hello', end='\t')
 print('World')
-
 print('Hello\tWorld')
 
 print('Hello\nWorld')

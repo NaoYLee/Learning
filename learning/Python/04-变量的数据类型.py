@@ -8,7 +8,7 @@ print(b)
 c = 'Monty Python'
 print(c)
 # Boolean型，值只有: True 和 False，也可以用0表示false，非0表示True
-d = True
+d = True  # Python 大小写敏感，Boolean类型必须首字母大写
 print(d)
 
 # Python会自动识别变量类型
