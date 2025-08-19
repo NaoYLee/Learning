@@ -121,7 +121,32 @@ HDFS会提供一个统一的逻辑目录，用于客户端对文件的访问
   - 数据按顺序流式写入第一个 `DataNode` → 第一个节点接收后转发给第二个 → 依此类推，形成**写入管道**。
   - 每个 `DataNode` 接收数据后先写入本地磁盘，再转发到下一节点。
 - 副本确认
-    最后一个 `DataNode` 成功写入后，逐级向前返回确认信号，最终由客户端通知 `NameNode` 写入完成。
+  - 最后一个 `DataNode` 成功写入后，逐级向前返回确认信号，最终由客户端通知 `NameNode` 写入完成。
+
+```mermaid
+graph LR
+    a[客户端] --1--> b[Name Node]
+    subgraph c1[Data Node 1]
+        d1[Block 1]
+    end
+    subgraph c2[Data Node 3]
+        d2[Block 2]
+    end
+    subgraph c3[Data Node 3]
+        d3[Block 3]
+    end
+    b --2--> c1
+    b --2--> c2
+    b --2--> c3
+    b --3--> a
+    a --4--> d1
+    d1 --4--> d2
+    d2 --4--> d3
+    c3 --5--> c2
+    c2 --5--> c1
+    c1 --5--> a
+    a --6--> b
+```
 
 #### 副本放置策略
 
@@ -355,7 +380,43 @@ hadoop archive -archiveName <文件名.har> -p <文件路径> <目标路径>
 8. `AM` 根据任务需求，向 `RM` 发送资源请求，包含需要的 **`Container` 数量**、每个 `Container` 的**资源规格**、**数据本地化要求**
 9. `RM` 根据集群中所有 `NM` 的心跳，在 `NM` 上分配 `Container` ，并通过心跳返回  `AM`
 10. `AM` 与对应的 `NM` 通信，发送需要在 `Container` 内运行的具体任务
-11.
+
+```mermaid
+graph TD
+    a[客户端] --1--> b[Resource Manager]
+    b --2、3--> a
+    a --4--> b
+    subgraph c1[Node Manager 1]
+        c[Application Master]
+        subgraph d1[Container 1]
+            e1[Map Task 1]
+        end
+    end
+    subgraph c2[Node Manager 2]
+        subgraph d2[Container 2]
+            e2[Map Task 2]
+            f[Reduce Task]
+        end
+    end
+    subgraph c3[Node Manager 3]
+        subgraph d3[Container 3]
+            e3[Map Task 3]
+        end
+    end
+    b --5--> c1
+    b --5--> c2
+    b --5--> c3
+    b --6--> c
+    c --7、8--> b
+    b --9--> c
+    c --10--> d1
+    c --10--> d2
+    c --10--> d3
+    e1 --11--> f
+    e2 --11--> f
+    e3 --11--> f
+    f --12--> a
+```
 
 #### 关键顺序要点总结
 
