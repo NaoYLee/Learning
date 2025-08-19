@@ -12,14 +12,14 @@ print(my_abs(-99))
 用from abstest import my_abs来导入my_abs()函数
 '''
 
-my_abs(1, 2)
+# my_abs(1, 2)
 '''
 TypeError: my_abs() takes 1 positional argument but 2 were given
 调用函数时，如果参数个数不对，Python解释器会自动检查出来，并抛出TypeError
 '''
 
-my_abs('A')
-abs('A')
+# my_abs('A')
+# abs('A')
 '''
 TypeError: '>=' not supported between instances of 'str' and 'int'
 TypeError: bad operand type for abs(): 'str'
@@ -34,26 +34,10 @@ def my_abs(x):
         return x
     else:
         return -x
-my_abs('A')
+# my_abs('A')
 '''
 TypeError: bad operand type
 添加了参数检查后，如果传入错误的参数类型，函数就可以抛出一个错误
-'''
-
-from math import cos, sin, pi
-def move(x, y, step, angle=0):
-    nx = x + step * cos(angle)
-    ny = y - step * sin(angle)
-    return nx, ny
-x, y = move(100, 100, 60, pi / 6)
-print(x, y)
-r = move(100, 100, 60, pi / 6)
-print(r)
-'''
-151.96152422706632 70.0
-(151.96152422706632, 70.0)
-函数的返回值是一个tuple，当使用多个变量进行接收时，按位置赋给对应的值
-Python的函数返回多值其实就是返回一个tuple
 '''
 
 def nop():
