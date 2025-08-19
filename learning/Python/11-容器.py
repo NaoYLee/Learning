@@ -1,3 +1,6 @@
+'''
+注意：一定要分清容器对象和变量的区别
+'''
 # 字符串
 my_str = 'Hello, Python!'  # 单引号/双引号定义
 print(type(my_str))

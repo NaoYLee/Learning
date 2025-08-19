@@ -7,8 +7,8 @@ sep, iterable, old, new, sub, prefix, suffix, i, x, s, key, default, other_dict 
 
 # 容器函数
 len(my_str)  # 返回容器元素数量  适用于 列表/元组/集合/字典/字符串等
-max(my_list)  # 返回最大元素  适用于 列表/元组/集合/字符串（按编码）
-min(my_tuple)  # 返回最小元素  适用于 列表/元组/集合/字符串（按编码）
+max(my_list)  # 返回最大元素  适用于 列表/元组/集合/字符串（按编码）/字典值
+min(my_tuple)  # 返回最小元素  适用于 列表/元组/集合/字符串（按编码）/字典值
 sum(my_set)  # 求和（仅数值型元素）  适用于 列表/元组/集合
 sorted(my_dict)  # 返回排序后的新列表  适用于 列表/元组/集合/字符串/字典键
 any(my_list)  # 任意元素为真则返回 True  列适用于 表/元组/集合/字典键

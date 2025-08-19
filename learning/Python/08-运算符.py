@@ -6,7 +6,6 @@ print(10 / 3)  # 商 3.33333
 print(10 // 3)  # 取整 3
 print(10 % 3)  # 取模 1
 print(10 ** 3)  # 幂 1000
-print('-' * 10)  # 输出10个-
 
 # 赋值运算符
 name = 'Monty Python'
@@ -50,3 +49,40 @@ print(2 or 3 or 10)  # 2
 # not取反
 print(not True)  # False
 print(not False)  # True
+
+# 公共运算符
+# + 适用于字符串、列表、元组
+print('abc'+ 'xyz')
+print([10, 20] + ['aa', 'bb'])
+print((10, 20) + ('aa', 'bb'))
+'''
+abcxyz
+[10, 20, 'aa', 'bb']
+(10, 20, 'aa', 'bb')
+'''
+
+# * 适用于字符串、列表、元组
+print('ab-' * 5)
+print([1, 2] * 5)
+print(('a', 'b') * 5)
+'''
+ab-ab-ab-ab-ab-
+[1, 2, 1, 2, 1, 2, 1, 2, 1, 2]
+('a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b')
+'''
+
+# in / not in 适用于字符串、列表、元组、字典key
+print('ab' in 'aabbcc')
+print(3 in [1, 2])
+print(4 not in (1, 2, 3, 4))
+print('Alice' in {'Alice':95, 'Bob':88, 'Charly':91})
+print('lice' in {'Alice':95, 'Bob':88, 'Charly':91})
+print(95 in {'Alice':95, 'Bob':88, 'Charly':91})
+'''
+True
+False
+False
+True
+False
+False
+'''

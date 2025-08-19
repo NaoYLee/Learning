@@ -19,6 +19,14 @@ True
 通过指定key的方式插入/修改键值对
 '''
 
+key = [1, 2, 3]
+my_dict[key] = 'a list'
+'''
+TypeError: unhashable type: 'list'
+要保证hash的正确性，作为key的对象就不能变
+在Python中，字符串、整数等都是不可变的，可以作为key，而list是可变的，不能作为key
+'''
+
 # .get()方法
 print(my_dict.get('Bob'))
 print(my_dict.get('Ela', '不存在'))
