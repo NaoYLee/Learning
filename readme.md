@@ -18,3 +18,6 @@
 
 ![Static Badge](https://img.shields.io/badge/Windows_11-a?color=%230067B8)
 ![Static Badge](https://img.shields.io/badge/Linux-a?logo=linux&logoColor=%23FFFFFF&color=%23FCC624)
+
+![Static Badge](https://img.shields.io/badge/Github-a?logo=github&logoColor=%23FFFFFF&color=%23181717)
+![Static Badge](https://img.shields.io/badge/Gitee-a?logo=gitee&logoColor=%23FFFFFF&color=%23C71D23)
