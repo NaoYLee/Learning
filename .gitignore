@@ -9,3 +9,5 @@ Desktop.ini
 *.egg-info
 dist
 build
+# Java：
+*.class
