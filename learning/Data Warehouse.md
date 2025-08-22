@@ -21,6 +21,36 @@
 | 数据操作 | 频繁增改删 | 很少改和删，以读为主 |
 | 查询类型 | 简单的、标准化的查询 | 复杂查询 |
 
+## 大数据平台
+
+- 自建数据平台
+  - 原生版本 + 代码重构
+
+- 商业版本平台
+  - Cloudera：CDH Cloudera’s Distribution including Apache Hadoop
+  - 星环科技：TDH Transwarp Data Hub
+  - Yahoo：HDP Hortonworks Data Platform
+
+- 云服务器
+
+## 引擎
+
+### 计算引擎
+
+- MapReduce
+  - 批处理
+- Tez
+  - 批处理
+- Spark
+  - 批+流（微批）
+- Flink
+  - 流批一体
+
+### 查询引擎
+
+- Impala
+- Presto
+
 ## 数仓的基本架构
 
 ### 数仓的层级设计
