@@ -12,8 +12,13 @@ public class CalcOfInt {
         System.out.println(y);
 
         i += 100;  // 3400
-        n -= 200;  // 22782
+        n -= 200;  // 22872
         System.out.println(i);
         System.out.println(n);
+
+        i++; // 3401, 相当于 n = n + 1;
+        System.out.println(i);
+        i--; // 3400, 相当于 n = n - 1;
+        System.out.println(i);
     }
 }
