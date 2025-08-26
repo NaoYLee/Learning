@@ -82,28 +82,6 @@ graph LR
 
 ## Spark 组成
 
-Master
-
-- 负责任务调度
-
-Worker
-
-- 负责任务执行
-
-spark运行时，Spark Application由2部分组成：Driver Program 和 Executors
-
-DriverProgram
-
-- 相当于 MRAppMaster，整个 Spark Application应用管理者，负责应用中所有 Job 调度执行
-- 一个 SparkApplication，仅有一个 DriverProgram
-- 以 JVM Process 进程运行，其实就是程序 MAIN 函数，必须创建 SparkContext 上下文对象
-
-Executor
-
-- 相当于1个线程池，以 JVM Process进程运行，其中运行 Task 任务，每个 Task 任务都是线程方式运行
-- 此外，Executor 中可以将缓存数据到内存中，比如 RDD 数据
-- 1个 SparkApplication 可以有多个 Executor，每个 Executor 可以资源（CPU Core 核数和 Memory 内存）
-
 ### 核心组件 Core Components
 
 Spark 官方维护的核心模块，通常包含在标准发行版中。
@@ -153,22 +131,73 @@ Spark 官方维护的核心模块，通常包含在标准发行版中。
 
 Spark 可以运行在多种集群管理模式上，并与其他大数据生态系统紧密集成。
 
+#### Client模式
+
+- 在当前操作系统启动1个 JVM 进程，指定最多同时运行 Task 任务数目，以线程方式运行 Task 任务。
+  - 本地模式时，可以认为 Driver 和 Executor 合为一体，就是一个 JVM Process进程。
+  - 当 Spark 程序运行在本地模式时，使用`--master local[N]`设置最多同时运行几个 Task，N表示 Task 数目。
+
+#### Cluster模式
+
 - 集群管理器 (Cluster Managers) Spark 支持多种集群资源管理方式，使其非常灵活：
-  - Standalone：Spark 自带的简单集群管理器，开箱即用。
-  - Apache Hadoop YARN：Hadoop 生态的资源管理器，这是在生产环境中最常见的部署模式。
-  - Apache Mesos：一个通用的集群管理器（现已逐渐被淘汰）。
-  - Kubernetes (K8s)：容器编排领域的的事实标准，Spark 官方近年来大力支持的方向，是未来的趋势。
+  - Standalone：Spark 自带的简单集群管理器，开箱即用（开发测试及生产环境使用）
+    - 类似 Hadoop YARN架构，典型的 Mater/Slaves 模式
+    - 使用 Zookeeper 搭建高可用，避免 Master 单点故障
+  - Apache Hadoop YARN：Hadoop 生态的资源管理器，这是在生产环境中最常见的部署模式（生产环境使用）
+    - 运行在 YARN 集群之上，由 YARN 负责资源管理，Spark 负责任务调度和计算
+    - 计算资源按需伸缩，集群利用率高，共享底层存储，避免数据跨集群迁移
+  - Apache Mesos：一个通用的集群管理器（现已逐渐被淘汰）
+  - Kubernetes (K8s)：容器编排领域的的事实标准，Spark 官方近年来大力支持的方向，是未来的趋势
+
+#### Spark 生态
 
 - 数据源连接器 (Data Sources) Spark 拥有一个庞大且不断增长的数据源生态系统，可以连接几乎所有常见的数据存储系统：
-  - 文件系统：HDFS、S3、Azure Data Lake Storage、Google Cloud Storage 等。
-  - 数据库：通过 JDBC 连接 PostgreSQL、MySQL 等；连接 Cassandra、MongoDB 等 NoSQL 数据库。
-  - 数据仓库：Apache Hive、Snowflake、Redshift、BigQuery。
-  - 消息队列：Kafka、Kinesis（常用于流处理数据源）。
+  - 文件系统：HDFS、S3、Azure Data Lake Storage、Google Cloud Storage 等
+  - 数据库：通过 JDBC 连接 PostgreSQL、MySQL 等；连接 Cassandra、MongoDB 等 NoSQL 数据库
+  - 数据仓库：Apache Hive、Snowflake、Redshift、BigQuery
+  - 消息队列：Kafka、Kinesis（常用于流处理数据源）
 
 - 社区项目与扩展 (Community Projects) 这些虽然不是 Spark 核心的一部分，但构成了强大的扩展生态系统：
-  - Delta Lake：一个开源存储层，为 Spark 带来 ACID 事务、数据版本控制（时间旅行）等功能，大大提升了数据可靠性。
-  - Koalas：让 Pandas 开发者能够在分布式 Spark 集群上运行代码的 API（现已集成到 PySpark 中作为 pandas API on Spark）。
-  - Spark NLP：一个建立在 Spark MLlib 之上的自然语言处理库。
+  - Delta Lake：一个开源存储层，为 Spark 带来 ACID 事务、数据版本控制（时间旅行）等功能，大大提升了数据可靠性
+  - Koalas：让 Pandas 开发者能够在分布式 Spark 集群上运行代码的 API（现已集成到 PySpark 中作为 pandas API on Spark）
+  - Spark NLP：一个建立在 Spark MLlib 之上的自然语言处理库
+
+### Standalone 模式下的进程
+
+Master
+
+- Spark 集群的主节点，通常运行在一个专用的主节点上
+- 集群资源管理和任务调度
+- 监控集群运行状态
+- 集群的资源管理器，负责接收应用请求并分配资源
+
+Worker
+
+- 负责任务执行
+- 为 Excutor 提供运行环境
+- 每个 Worker 会运行一个或多个 Executor
+- 运行在每个从节点（Slave Node）上的进程
+- 负责管理本节点的资源（CPU、内存），并启动和管理 Executor进程
+- 向 Master 汇报本节点的资源状况
+
+Driver
+
+- 是运行 main() 函数的进程，并且创建 SparkContext（或 SparkSession）
+  - 将用户程序（用户代码）转换为一系列可并行执行的任务（Tasks）
+  - 与集群管理器（Cluster Manager）通信，为 Executor 申请资源
+  - 调度任务到各个 Executor 上并协调它们的执行
+  - 收集任务执行的结果（如果结果集很大，如 collect()，可能会成为瓶颈）
+  - 持有并维护所有的 Spark 高级抽象（如 RDD, DataFrame）
+
+Executor
+
+- 是在集群的工作节点（Worker Nodes） 上启动的进程，负责执行具体的计算任务
+  - 执行由 Driver 分配给它的 Task（任务）
+  - 将数据和计算结果缓存在内存或磁盘中（例如，当调用 RDD.cache() 或 DataFrame.cache() 时）
+  - 向 Driver 报告任务的状态和执行结果
+- 每个节点可以运行多个 Executor
+- 每个 Executor 可以分配多个 CPU Core 来并行执行多个 Task
+- Executor 的内存大小可以配置，一部分用于执行任务（Execution Memory），一部分用于存储缓存数据（Storage Memory）
 
 ## Spark 功能及特点
 
@@ -299,28 +328,80 @@ DAG 的作用就是清晰描述这种依赖关系和并行可能，让大数据�
 
 - 相对 Spark 耗费资源较少，在资源不充足的情况下也能得到计算结果
 
-## Spark 部署模式
+### Spark stage 的划分
 
-Spark 框架编写的应用程序支持多种运行模式：
+Stage划分**最根本、唯一的依据就是宽依赖**（Shuffle Dependency）。
 
-1. 本地模式（Local Mode）
-2. 集群模式（Cluster Mode）
-3. 云端（K8s）：部署在K8S云服务上
+一个宽依赖就会在RDD的计算图中创建一个Stage的边界。  
+换句话说，Spark的调度器（DAGScheduler）会从后向前回溯整个计算图（RDD DAG），每遇到一个宽依赖，就划断，宽依赖之前的操作属于一个Stage，之后的操作属于另一个Stage。
 
-### 本地模式
+这样划分出来的Stage有两个类型：
 
-- LocalMode：在当前操作系统启动1个 JVM 进程，指定最多同时运行 Task 任务数目，以线程方式运行 Task 任务。
-  - 本地模式时，可以认为 DriverProgram 和 Executor 合为一体，就是一个 JVM Process进程。
-  - 当 Spark 程序运行在本地模式时，使用`--master local[N]`设置最多同时运行几个 Task，N表示 Task 数目。
+1. ShuffleMapStage
+    - 它的输出是下一个Stage的输入。
+    - 这个Stage的末尾一定会有一个Shuffle操作，它的Task（任务）运行结果会写入磁盘（Shuffle文件），为下一个Stage做准备。
+    - 一个作业中可能有多个ShuffleMapStage。
 
-### 集群模式
+2. ResultStage
+    - 它是最终Stage，负责产生作业的最终结果（如将结果返回驱动器程序或写入外部存储）。
+    - 一个作业只有一个ResultStage。
 
-- Hadoop YARN集群模式（生产环境使用）
-  - 运行在 YARN 集群之上，由 YARN 负责资源管理，Spark 负责任务调度和计算
-  - 计算资源按需伸缩，集群利用率高，共享底层存储，避免数据跨集群迁移
-- Spark Standalone集群模式（开发测试及生产环境使用）
-  - 类似 Hadoop YARN架构，典型的 Mater/Slaves 模式
-  - 使用 Zookeeper 搭建高可用，避免 Master 单点故障
+#### 宽窄依赖
+
+RDD由多个分区（Partition） 组成，每个分区存储一部分数据。  
+当一个RDD通过转换操作（如`map`, `filter`, `join`）生成另一个RDD时，新RDD的每个分区数据来自于父RDD的一个或多个分区。
+
+宽窄依赖的本质，就是看子RDD的每个分区是依赖于父RDD的少数分区（窄）还是全部/多数分区（宽）。
+
+1. 窄依赖 (Narrow Dependency)
+    - 定义：父RDD的每一个分区最多被子RDD的一个分区所使用。这是一种一对一或多对一的依赖关系
+    - 常见操作：`map`, `filter`, `flatMap`, `union`, `sample`等
+    - 窄依赖的关键特性：
+        - 性能：可以流水线（pipeline） 执行。多个窄依赖操作（如`map`后接`filter`）可以在一个Task中连续完成，无需物化中间结果，效率极高
+        - 容错：恢复成本低。如果子RDD的一个分区数据丢失，只需要重新计算父RDD中它依赖的那一个或几个分区即可，不需要重新计算整个父RDD
+
+2. 宽依赖 (Wide Dependency / Shuffle Dependency)
+    - 定义：父RDD的每一个分区的数据，可能被子RDD的多个分区使用。这是一种一对多的依赖关系，它要求所有父分区的数据必须被重新洗牌（Shuffle）和重新分组
+    - 常见操作：`groupByKey`, `reduceByKey`, `join`（非相同分区器时）, `repartition`, `distinct`, `sortByKey`等。
+    - 宽依赖的关键特性：
+        - 性能：必须发生Shuffle。这是Spark中最昂贵（expensive）的操作。它需要将父RDD所有分区数据计算出来，跨网络传输到不同的节点，写入磁盘，然后子RDD的Task才能读取。这会引入巨大的磁盘I/O、网络I/O和序列化开销。
+        - 容错：恢复成本高。如果子RDD的一个分区数据丢失，由于其父RDD的所有分区都参与了计算，因此可能需要重新计算整个父RDD的所有分区，然后再次进行Shuffle。
+
+| 特性 | 窄依赖 (Narrow Dependency) | 宽依赖 (Wide Dependency / Shuffle Dependency) |
+| - | - | - |
+| 数据依赖 | 子分区依赖于固定的少数父分区 | 子分区依赖于父RDD的所有或多个分区 |
+| 数据传输 | 无需Shuffle，可在单个节点内流水线计算 | 必须Shuffle，需要跨节点混洗数据 |
+| 性能 | 高效，无网络传输 | 昂贵，带来大量磁盘I/O和网络I/O |
+| 容错 | 高效，只重新计算丢失分区的父分区 | 低效，可能需重新计算所有父分区并Shuffle |
+| Stage划分 | 不会导致Stage划分 | 是Stage划分的唯一依据 |
+| 例子 | `map`, `filter`, `union` | `groupByKey`, `reduceByKey`, `repartition` |
+
+#### 为什么依据宽依赖来划分？
+
+1. 任务并行优化（Pipeline）
+    - 窄依赖
+        - 代表一组可以流水线化（pipeline）执行的计算。例如，一个RDD先经过`map`操作，再经过`filter`操作，这两个操作都是窄依赖。
+        - Spark可以将这两个操作融合在一起，在一个Task中连续执行，而无需将中间结果落盘或通过网络传输。这大大减少了开销。
+    - 宽依赖
+        - 代表需要Shuffle的操作。它要求所有父分区的数据必须被重新洗牌（shuffle）、分组，然后才能进行下一步计算。
+        - Shuffle是一个同步点，它要求当前Stage的所有Task都必须全部执行完成，并将输出数据持久化到磁盘上，下一个Stage的Task才能开始读取这些数据。
+    - 因此，Stage的划分实际上是在寻找那些可以连续进行流水线计算的最大计算链。一个Stage内部是一连串的窄依赖，可以进行流水线优化；而Stage的边界一定是宽依赖，需要进行Shuffle和同步等待。
+
+2. 容错恢复
+    - 窄依赖
+        - 恢复一个丢失的分区成本很低。例如，一个经过`map`和`filter`的RDD某个分区丢失了，只需要重新计算父RDD对应的那个分区即可。
+    - 宽依赖
+        - 恢复成本非常高。因为Shuffle操作中，一个子RDD的分区数据来源于父RDD的所有分区。
+        - 如果子RDD的一个分区丢失，需要重新计算父RDD的所有分区，然后再次进行Shuffle。
+    - 将宽依赖作为Stage边界，使得每个Stage内部的Task都是独立的，它们的失败恢复不会相互影响，简化了容错逻辑。
+
+### Spark 的缓存机制
+
+| 缓存级别 ||
+| - | - |
+|`Memory Only`| 只存储在RAM中 |
+|`Memory And Disk`| RAM空间不足时溢出至磁盘 |
+|`Disk Only`| 只存储在磁盘中 |
 
 ## Spark Core
 
@@ -493,7 +574,7 @@ grouped_rdd = pairs_rdd.groupByKey()
 ```
 
 **警告**：在Spark中，直接使用groupByKey通常性能较差，因为它会在网络上传输所有数据。  
-优先使用reduceByKey或aggregateByKey，因为它们会在Shuffle前先在Map端进行Combine（本地聚合）。
+优先使用 reduceByKey 或 aggregateByKey ，因为它们会在Shuffle前先在Map端进行Combine（本地聚合）。
 
 #### `reduceByKey(func)`
 
@@ -605,7 +686,18 @@ result_rdd.foreach(send_to_db)
 
 ![Static Badge](https://img.shields.io/badge/NEED_TO_BE_DONE-red)
 
-## RDD 与 DataFrame 的对比
+## RDD、 DataFrame、 DataSet
+
+```mermaid
+graph TD
+    A[开始选择Spark API] --> B{数据是结构化/半结构化吗？}
+    B -- 否 --> C[使用RDD<br>非结构化数据、定制化算法、极致控制]
+    B -- 是 --> D{使用Scala或Java吗？}
+    D -- 否（使用Python/R）--> E[使用DataFrame<br>享受Catalyst和Tungsten的自动优化]
+    D -- 是 --> F{需要编译时类型安全吗？<br>（例如：复杂业务逻辑、大型项目）}
+    F -- 否 --> E
+    F -- 是 --> G[使用Dataset<br>兼顾类型安全与执行性能]
+```
 
 ### RDD 的优势与劣势
 
@@ -614,29 +706,30 @@ result_rdd.foreach(send_to_db)
 #### 优势 (Why you might choose RDD)
 
 1. 底层控制与灵活性 (Low-Level Control & Flexibility)
-    - RDD是Spark最底层的抽象，你可以用它实现任何你能想到的计算逻辑，无论多么复杂、非结构化。
-    - 用例：处理高度非结构化的数据（如文本流、图像流），或者需要实现非常定制化、复杂的迭代算法（例如某些图算法或机器学习算法）。
+    - RDD是Spark最底层的抽象，你可以用它实现任何你能想到的计算逻辑，无论多么复杂、非结构化
+    - 用例：处理高度非结构化的数据（如文本流、图像流），或者需要实现非常定制化、复杂的迭代算法（例如某些图算法或机器学习算法）
 
 2. 编译时类型安全 (Compile-Time Type Safety)
-    - 在Java和Scala中，RDD是强类型的（如RDD[Person], RDD[(String, Int)]）。这意味着类型错误会在编译时就被发现，而不是在运行时才报错，提高了代码的健壮性。
-    - 用例：对代码稳定性和类型安全要求极高的复杂应用。
+    - 在Java和Scala中，RDD是强类型的（如RDD[Person], RDD[(String, Int)]）
+    - 这意味着类型错误会在编译时就被发现，而不是在运行时才报错，提高了代码的健壮性（鲁棒性笑）
+    - 用例：对代码稳定性和类型安全要求极高的复杂应用
 
 3. 面向对象编程风格 (Object-Oriented Programming)
-    - 你可以使用熟悉的面向对象范式，通过map、flatMap、filter等高阶函数，用匿名函数或命名函数来处理每个对象。
-    - 对于来自函数式编程背景的开发者来说，这种方式非常直观。
+    - 你可以使用熟悉的面向对象范式，通过map、flatMap、filter等高阶函数，用匿名函数或命名函数来处理每个对象
+    - 对于来自函数式编程背景的开发者来说，这种方式非常直观
 
 #### 劣势 (Why you might avoid RDD)
 
 1. 性能开销大 (Performance Overhead)
-    - 无优化引擎：Spark Core（执行RDD）对RDD的计算过程是“黑盒”的，它不知道你要做什么，只能按代码一步步执行，无法进行深度优化。
-    - 对象序列化/GC开销：每个步骤中的数据都是以JVM/Python对象的形式存在，大量的对象创建和销毁会导致高昂的序列化/反序列化成本和垃圾回收（Garbage Collection） 压力，尤其是在数据量巨大时。
-    - 内存使用：基于对象的存储效率较低。
+    - 无优化引擎：Spark Core（执行RDD）对RDD的计算过程是“黑盒”的，它不知道你要做什么，只能按代码一步步执行，无法进行深度优化
+    - 对象序列化/GC开销：每个步骤中的数据都是以JVM/Python对象的形式存在，大量的对象创建和销毁会导致高昂的序列化/反序列化成本和垃圾回收（Garbage Collection） 压力，尤其是在数据量巨大时
+    - 内存使用：基于对象的存储效率较低
 
 2. 开发效率较低 (Lower Developer Productivity)
-    - 你需要手动编写和优化每一步计算。例如，即使是一个简单的“按部门分组并求平均工资”，你也需要手动用map、reduceByKey等操作来实现，代码冗长且容易出错。
+    - 你需要手动编写和优化每一步计算。例如，即使是一个简单的“按部门分组并求平均工资”，你也需要手动用map、reduceByKey等操作来实现，代码冗长且容易出错
 
 3. API相对底层 (Lower-Level API)
-    - 对于常见的SQL类操作（如过滤、分组、聚合、连接），使用RDD API比使用SQL或DataFrame API更繁琐。
+    - 对于常见的SQL类操作（如过滤、分组、聚合、连接），使用RDD API比使用SQL或DataFrame API更繁琐
 
 ### DataFrame 的优势与劣势
 
@@ -645,28 +738,53 @@ result_rdd.foreach(send_to_db)
 #### 优势 (Why you might choose DataFrame)
 
 1. 极高的性能 (High Performance)
-    - Catalyst优化器：这是DataFrame最大的优势。Spark SQL的Catalyst优化器会对你编写的代码（无论是SQL还是DataFrame API）进行逻辑优化和物理优化（如谓词下推、列剪枝、常量折叠、成本优化选择join策略等），生成一个高度优化的执行计划。
-    - Tungsten执行引擎：它直接在二进制格式上操作，完全跳过JVM对象。
-    - 列式存储：数据按列存储，对于只访问某几列的查询极其高效。
-    - 堆外内存管理：减少GC开销。
-    - 代码生成：在运行时生成优化的字节码。
+    - Catalyst优化器：这是DataFrame最大的优势。Spark SQL的Catalyst优化器会对你编写的代码（无论是SQL还是DataFrame API）进行逻辑优化和物理优化（如谓词下推、列剪枝、常量折叠、成本优化选择join策略等），生成一个高度优化的执行计划
+    - Tungsten执行引擎：它直接在二进制格式上操作，完全跳过JVM对象
+    - 列式存储：数据按列存储，对于只访问某几列的查询极其高效
+    - 堆外内存管理：减少GC开销
+    - 代码生成：在运行时生成优化的字节码
 
 2. 开发效率高 (High Developer Productivity)
-    - 声明式API：你只需要声明你想要什么（groupBy("dept").avg("salary")），而不需要指定如何计算。这大大简化了代码。
-    - 无缝集成SQL：你可以直接对DataFrame运行SQL查询，这对于熟悉SQL的数据分析师和工程师来说门槛极低。
-    - 丰富的内置函数：提供了大量针对结构化数据操作的高效内置函数（在org.apache.spark.sql.functions包中），避免了大量自定义函数的编写。
+    - 声明式API：你只需要声明你想要什么（groupBy("dept").avg("salary")），而不需要指定如何计算。这大大简化了代码
+    - 无缝集成SQL：你可以直接对DataFrame运行SQL查询，这对于熟悉SQL的数据分析师和工程师来说门槛极低
+    - 丰富的内置函数：提供了大量针对结构化数据操作的高效内置函数（在org.apache.spark.sql.functions包中），避免了大量自定义函数的编写
 
 3. 生态集成好 (Ecosystem Integration)
-    - DataFrame是与Spark其他高阶组件（如Streaming、MLlib）交互的标准接口。读取和写入各种数据源（Parquet, ORC, JSON, JDBC, Avro等）的API都是基于DataFrame构建的。
+    - DataFrame是与Spark其他高阶组件（如Streaming、MLlib）交互的标准接口。读取和写入各种数据源（Parquet, ORC, JSON, JDBC, Avro等）的API都是基于DataFrame构建的
 
 #### 劣势 (Why you might avoid DataFrame)
 
 1. 编译时类型安全较弱 (Weaker Compile-Time Type Safety)
-    - 由于DataFrame中的每一行都是一个通用的Row对象，其字段的类型是在运行时通过Schema来检查和解析的。这意味着如果你错误地引用了一个不存在的列名，错误要到运行时才会抛出。
-    - 注意：在Scala中，你可以使用强类型的Dataset[T]（需要显式编码器）来在性能和类型安全之间取得平衡，但它通常比DataFrame稍慢。
+    - 由于DataFrame中的每一行都是一个通用的Row对象，其字段的类型是在运行时通过Schema来检查和解析的。这意味着如果你错误地引用了一个不存在的列名，错误要到运行时才会抛出
+    - 注意：在Scala中，你可以使用强类型的`Dataset[T]`（需要显式编码器）来在性能和类型安全之间取得平衡，但它通常比DataFrame稍慢
 
 2. 灵活性受限 (Limited Flexibility)
-    - DataFrame要求数据必须是结构化的或半结构化的（即有Schema）。如果你需要处理完全非结构化的数据，或者执行一些无法用SQL范式表达的极端复杂的操作，RDD可能是更好的选择。
+    - DataFrame要求数据必须是结构化的或半结构化的（即有Schema）。如果你需要处理完全非结构化的数据，或者执行一些无法用SQL范式表达的极端复杂的操作，RDD可能是更好的选择
+
+### Dataset 的优势与劣势
+
+**Dataset**：是DataFrame API的一个扩展，试图提供两全其美的方案。  
+它是强类型的（Strongly-typed）不可变集合，其数据类型由用户定义的类（Case Class）或基本类型来指定。
+
+可以把`Dataset[T]`理解为：`DataFrame`（=`Dataset[Row]`） + 强类型的`T`。
+
+#### 优势 (Why you might choose Dataset)
+
+1. 兼具RDD和DataFrame的优点
+    - 类型安全：像RDD一样，在编译时就能发现类型错误（例如，对字符串类型的字段进行数学运算）
+    - 性能优越：像DataFrame一样，享受Catalyst优化器和Tungsten执行引擎带来的性能提升
+    - 面向对象：可以使用Lambda函数和函数式编程，操作的是自定义的类对象（如`dataset.map(_.age + 1)`），代码更直观易读
+
+2. 无缝互操作
+    - 与DataFrame之间可以轻松转换（`df.as[T]` 和 `dataset.toDF()`）
+
+#### 劣势 (Why you might avoid Dataset)
+
+1. 语言支持限制
+    - 强类型API仅在Scala和Java中可用。Python和R由于不是运行在JVM上，缺乏编译时类型系统，因此只有无类型的DataFrame（即`Dataset[Row]`）
+
+2. 性能微开销
+    - 相比于DataFrame，在涉及到序列化时，为了转换成具体的类型对象，可能会有非常微小的性能开销。但在大多数情况下，优化器的优势远大于此开销
 
 ### 对比总结表
 
