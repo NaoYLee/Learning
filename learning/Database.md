@@ -1211,9 +1211,216 @@ BEGIN
 END $$;
 ```
 
+```sql
+DO $$
+BEGIN
+    UPDATE users
+    SET user_age = user_age + 10;
+    RAISE NOTICE '共有%条数据', sql%ROWCOUNT;
+END $$;
+DO $$
+DECLARE
+    CURSOR cur_customer IS SELECT * FROM customer;  -- :定义游标 cur_customers ，内容为 SELECT * FROM customer 。
+    v_customer customer %rowtype;  -- :声明变量 v_customer 为 customer 表中字段类型。
+BEGIN
+    OPEN cur_customer;  -- :开启游标
+    FETCH cur_customer INTO v_customer;  -- :抓取数据注入游标
+    RAISE NOTICE '%', v_customer.customer_name;  -- :输出游标
+    FETCH cur_customer INTO v_customer;  -- :抓取下一条数据注入游标
+    RAISE NOTICE '%', v_customer.customer_name;  -- :输出游标
+    CLOSE cur_customer;  -- :关闭游标
+END $$;
+DO $$
+DECLARE
+    CURSOR cur_customer IS SELECT * FROM customer;  -- :定义游标 cur_customer，内容为 SELECT * FROM customer 。
+    v_customer customer %rowtype;  -- !使用游标时记得定义 %rowtype 类型
+BEGIN
+    OPEN cur_customer;  -- :开启游标
+    LOOP  -- :循环
+        FETCH cur_customer INTO v_customer;  -- :抓取数据注入游标
+        EXIT WHEN cur_customer%NOTFOUND;  -- :游标为最后一行时退出循环
+        RAISE NOTICE '1.%的信用积分为%', v_customer.customer_name, v_customer.credit_score;  -- :输出游标
+    END LOOP;  -- :循环结束
+    CLOSE cur_customer;  -- :关闭游标
+-- :以下为使用FOR循环，不需要手动开启游标
+    FOR v_customer IN cur_customer
+    LOOP
+        RAISE NOTICE '2.%的信用积分为%', v_customer.customer_name, v_customer.credit_score;  -- :输出游标
+    END LOOP;
+-- :FOR循环示例结束
+END $$;
+DO $$
+DECLARE  -- :不显式定义游标时的写法
+    v_customer customer %rowtype;
+BEGIN
+    FOR v_customer IN (SELECT * FROM customer)  -- :使用 FOR 语句时游标会自动开启
+    LOOP
+        RAISE NOTICE '%的信用积分为%', v_customer.customer_name, v_customer.credit_score;  -- :输出游标
+    END LOOP;
+END $$;
+DO $$
+DECLARE
+    v_ename emp.ename %type;
+BEGIN
+    RAISE NOTICE '执行前 ROWCOUNT 的值为%', sql%rowcount;
+    RAISE NOTICE '执行前 FOUND 的值为%', sql%found;
+    SELECT emp.ename
+    INTO v_ename
+    FROM emp
+    WHERE empno = 7788;
+    RAISE NOTICE '执行后 ROWCOUNT 的值为%', sql%rowcount;
+    RAISE NOTICE '执行后 FOUND 的值为%', sql%found;
+END $$;
+DO $$  -- :动态游标使用示例
+DECLARE
+    TYPE ref_cur_type IS REF CURSOR;  -- :声明动态游标类型
+    cur_type ref_cur_type;  -- :声明动态游标
+    v_dept dept %rowtype;  -- :游标搭配 %rowtype 数据类型使用，下同
+    v_emp emp %rowtype;  -- :同上
+BEGIN
+    OPEN cur_type FOR  -- :开启游标
+        SELECT * FROM dept;  -- :声明游标SQL语句
+    LOOP
+        FETCH cur_type INTO v_dept;
+        EXIT WHEN cur_type%NOTFOUND;
+        RAISE NOTICE '%', v_dept;
+    END LOOP;
+    CLOSE cur_type;
+    OPEN cur_type FOR
+        SELECT * FROM emp WHERE deptno = 30;
+    FETCH cur_type INTO v_emp;  -- !使用WHILE循环时必须先FETCH游标，否则无法满足循环条件
+    WHILE cur_type%FOUND  -- :使用WHILE循环
+    LOOP
+        RAISE NOTICE '%', v_emp;
+        FETCH cur_type INTO v_emp; 
+    END LOOP;
+    CLOSE cur_type;
+END $$;
+CREATE OR REPLACE PROCEDURE proc_emp  -- !DDL不能写进DO$$..$$块中!
+AS
+DECLARE
+    v_ename emp.ename %TYPE;
+    v_sal emp.sal %TYPE;
+BEGIN
+    SELECT ename, sal
+    INTO   v_ename, v_sal
+    FROM   emp
+    WHERE  empno = 7788;
+    RAISE NOTICE '%,%',v_ename, v_sal;
+EXCEPTION
+    WHEN others THEN
+    RAISE NOTICE '出现异常';
+    RAISE NOTICE '%',SQLCODE;
+    RAISE NOTICE '%',SQLERRM;
+END;
+DO $$
+BEGIN
+  proc_emp;
+END $$;
+```
+
 #### 自定义函数
 
+```sql
+-- Active: 1752845857763@@192.168.10.130@5432@gaussdb_learning@public
+-- IDE：Visual Studio Code EXTENSIONS: 1.cweijan.vscode-postgresql-client2 2.aaron-bond.better-comments
+-- todo自定义一个比较两数大小的函数
+CREATE OR REPLACE FUNCTION func_greater(
+    input_a number,
+    input_b number
+) RETURN number
+IS
+DECLARE
+    equal EXCEPTION;  -- :声明一个异常equal
+BEGIN
+    IF input_a = input_b
+    THEN
+        RAISE equal;  -- :当两数相等时抛出异常equal
+    ELSEIF input_a > input_b
+    THEN
+        RAISE NOTICE '较大的数是：';
+        RETURN input_a;
+    ELSE
+        RAISE NOTICE '较大的数是：';
+        RETURN input_b;
+    END IF;
+EXCEPTION
+    WHEN equal THEN  -- :当检查到equal异常时执行如下代码
+    RAISE NOTICE '两数相等，都为';
+    RETURN input_a;
+END;
+-- todo测试函数功能
+BEGIN
+    RAISE NOTICE '%',greater(10.9, 10.11);
+END;
+CREATE OR REPLACE PROCEDURE proc_emp  -- !DDL不能写进DO$$..$$块中!
+AS
+DECLARE
+    v_ename emp.ename %TYPE;
+    v_sal emp.sal %TYPE;
+BEGIN
+    SELECT ename, sal
+    INTO   v_ename, v_sal
+    FROM   emp
+    WHERE  empno = 7788;
+    RAISE NOTICE '%,%',v_ename, v_sal;
+EXCEPTION
+    WHEN others THEN
+    RAISE NOTICE '出现异常';
+    RAISE NOTICE '%',SQLCODE;
+    RAISE NOTICE '%',SQLERRM;
+END;
+DO $$
+BEGIN
+  proc_emp;
+END $$;
+```
+
 #### 存储过程
+
+```sql
+CREATE OR REPLACE PROCEDURE dynamic_employee_query (
+    p_column_name IN varchar2,
+    p_operator IN varchar2,
+    p_value IN varchar2
+)
+IS
+DECLARE
+    column_name_not_exists EXCEPTION;
+    TYPE ref_cur_emp IS REF CURSOR;
+    cur_emp ref_cur_emp;
+    v_sql varchar2;
+    v_emp employees%rowtype;
+BEGIN
+    IF p_column_name NOT IN (
+        'emp_id',
+        'emp_name',
+        'salary',
+        'dept_id'
+    ) THEN
+        RAISE column_name_not_exists;
+    END IF;
+    
+    v_sql := 'SELECT * FROM employees WHERE ' || p_column_name || ' ' || p_operator || ' :1';
+    
+    OPEN cur_emp FOR v_sql USING p_value;
+
+    LOOP
+        FETCH cur_emp INTO v_emp;
+        EXIT WHEN cur_emp%NOTFOUND;
+        RAISE NOTICE '员工ID%, 姓名%, 工资%, 部门ID%', v_emp.emp_id, v_emp.emp_name, v_emp.salary, v_emp.dept_id;
+    END LOOP;
+
+    CLOSE cur_emp;
+EXCEPTION
+    WHEN column_name_not_exists THEN
+        RAISE NOTICE '错误：无效列名';
+END;
+CALL dynamic_employee_query('salary', '>', '7000');  -- :只有无输出的过程才能用`call`调用
+BEGIN
+    dynamic_employee_query('salary', '>', '7000');
+END;
+```
 
 ### 分区
 
