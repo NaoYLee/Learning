@@ -2,8 +2,8 @@
 Thumbs.db
 ehthumbs.db
 Desktop.ini
-# VSCode
-*-workspace
+# VS Code
+*.code-workspace
 # Python:
 *.py[cod]
 *.so
