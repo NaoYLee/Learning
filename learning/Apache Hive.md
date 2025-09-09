@@ -305,12 +305,16 @@ DESCRIBE FUNCTION EXTENED <function>;
 | current_date() | 返回当前日期（DATE 类型） | current_date() | 2025-05-27 |
 | current_timestamp() | 返回当前时间戳（TIMESTAMP 类型） | current_timestamp() | 2025-05-2712:34:56.789 |
 | unix_timestamp() | 返回当前Unix 时间戳（整数，秒级） | unix_timestamp() | 1748354096 |
-| year([date\|timestamp]) | 返回年份 | year('2025-05-27') | 2025 |
-| month([date\|timestamp]) | 返回月份（1-12） | month('2025-05-27') | 5 |
-| day([date\|timestamp]) | 返回日期（1-31） | day('2025-05-27') | 27 |
+| year(date) | 返回年份 | year('2025-05-27') | 2025 |
+| quarter(date) | 返回季度（1-4） | quarter('2025-05-27') | 2 |
+| month(date) | 返回月份（1-12） | month('2025-05-27') | 5 |
+| day(date) | 返回日期（1-31） | day('2025-05-27') | 27 |
 | hour(timestamp) | 返回小时（0-23） | hour('2025-05-2712:34:56') | 12 |
 | minute(timestamp) | 返回分钟（0-59） | minute('2025-05-27 12:34:56') | 34 |
 | second(timestamp) | 返回秒（0-59） | second('2025-05-27 12:34:56') | 56 |
+| dayofmonth(date) | 获取日期所在月份的第几天（1-31） | dayofmonth('2025-05-27') | 27 |
+| dayofweek(date) | 获取日期所在周的第几天（1-7） | dayofweek('2025-05-27') | 6 |
+| weekofyear(date) | 获取日期所在周的周数（1-53） | weekofyear('2025-05-27') | 20 |
 | date_add(date, n) | 日期加 n 天 | date_add('2025-05-27', 3) | 2025-05-30 |
 | date_sub(date, n) | 日期减 n 天 | date_sub('2025-05-27', 3) | 2025-05-24 |
 | add_months(date, n) | 日期加 n 个月 | add_months('2025-05-27', 1) | 2025-06-27 |
@@ -320,6 +324,8 @@ DESCRIBE FUNCTION EXTENED <function>;
 | date_format([date\|timestamp], format) | 按指定格式格式化日期 | date_format('2025-05-27', 'yyyy-MM-dd') | 2025-05-27 |
 | to_date([timestamp\|string]) | 将时间戳或字符串转为DATE 类型 | to_date('2025-05-27 12:34:56') | 2025-05-27 |
 | trunc(date, format) | 按指定单位截断日期（如月份、季度） | trunc('2025-05-27', 'MM') | 2025-05-01 |
+| last_day(date) | 返回指定日期所在月份的最后一天 | last_day('2025-05-27') | 2025-05-31 |
+| next_day(date, day_of_week) | 返回指定日期的下一个指定星期 | next_day('2025-05-27', 'MON') | 2025-06-04 |
 
 #### 类型转换函数
 
