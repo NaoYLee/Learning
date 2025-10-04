@@ -403,6 +403,84 @@ RDD由多个分区（Partition） 组成，每个分区存储一部分数据。
 |`Memory And Disk`| RAM空间不足时溢出至磁盘 |
 |`Disk Only`| 只存储在磁盘中 |
 
+### Spark 的 Shuffle 类型
+
+#### Hash Shuffle (已弃用)
+
+这是 Spark 早期版本（1.2 之前）的默认 Shuffle 机制。
+
+**核心机制**：
+
+- 在 Shuffle Write 阶段，每个 Mapper 任务会为下一个阶段的每个 Reducer 任务都创建一个单独的磁盘文件。
+  - 例如：如果当前阶段有 M 个任务（M个Mapper），下一个阶段有 R 个任务（R个Reducer），那么就会在磁盘上产生 M * R 个文件。
+- 优点
+  - 不需要排序，写入磁盘的操作是并行进行的，速度相对较快（在某些特定场景下）。
+- 缺点
+  - 大量小文件问题：产生的文件数量与 M * R 成正比。如果 M 和 R 都很大（比如 M=1000, R=1000），就会产生 100万个中间小文件。这对磁盘 IO 和文件系统性能是巨大的压力，会导致稳定性下降和性能急剧劣化。
+  - 正因为这个严重的缺陷，Hash Shuffle 在后续版本中被弃用，并被 Sort Shuffle 所取代。
+
+#### Sort Shuffle (默认类型)
+
+从 Spark 1.2 开始，Sort Shuffle 成为默认的 Shuffle 管理器。它有效地解决了 Hash Shuffle 的小文件问题。
+
+**核心机制**：
+
+- 在 Shuffle Write 阶段，每个 Mapper 任务不会为每个 Reducer 创建单独的文件，而是将所有数据写入一个单独的文件中
+  - 这个过程如下：
+    1. 排序聚合：Mapper 任务根据目标 Reducer 的 ID（即 Partition ID）对数据进行排序。这个过程可能也会在内存中进行聚合（如果mapSideCombine为 true）。
+    2. 写入单个文件：排序后的数据被写入一个数据文件（.data）。
+    3. 生成索引文件：同时，它会生成一个索引文件（.index），该索引文件记录了每个分区（对应一个Reducer）在数据文件中的起始和结束位置。
+  - 每个 Mapper 任务最终只产生 2 个文件（一个数据文件，一个索引文件）。总文件数从 M *R 降到了 2* M，这是一个巨大的改进。
+- 在 Shuffle Read 阶段，Reducer 任务根据自己的 ID，通过索引文件找到自己那部分数据在文件中的位置，然后读取即可。
+
+##### 子类型与模式
+
+Sort Shuffle 本身根据操作类型和配置，有不同的运行模式
+
+**普通序列化模式** (Serialized)
+
+数据在内存中排序时是以序列化格式进行的
+
+- 优点
+  - 更紧凑的内存使用，可以减少 GC 开销，处理的数据量更大
+- 触发条件
+  - 默认选择，或者当满足spark.shuffle.spill条件且使用了支持序列化的序列化器（如 KryoSerializer）时
+
+**反序列化模式** (Deserialized)
+
+数据在内存中排序时是以 Java 对象格式（反序列化格式）进行的
+
+- 缺点
+  - 内存开销大，容易触发 GC 和溢出（Spill）到磁盘
+- 触发条件
+  - 当指定了基于排序的聚合（如reduceByKey）或者排序（sortByKey）时，或者使用了不支持序列化排序的序列化器时
+
+**Tungsten-Sort** (基于堆外内存)
+
+这不是一个独立的 Shuffle 类型，而是 Sort Shuffle 的一种高性能优化实现
+
+- 它引入了 Tungsten 项目，特点包括
+  - 堆外内存管理
+    - 自行管理内存，完全避开 JVM 的 GC，极大地减少了垃圾回收的停顿
+  - 紧凑的二进制格式
+    - 数据以更高效的二进制格式存储，节省空间和传输开销
+  - 缓存友好
+    - 使用基于缓存的计算方式提升效率
+- 在 Spark 1.4+ 之后，Tungsten-Sort 的特性已经逐步集成到默认的 Sort Shuffle 实现中了
+- 可以通过配置spark.shuffle.manager=sort（默认）来启用包含 Tungsten 优化的 Sort Shuffle
+
+**Bypass Merge Sort** (绕过分区排序)
+
+这是 Sort Shuffle 的一种特殊优化路径
+
+- 触发条件
+  - 当 shuffle dependency 没有指定聚合（aggregation）或排序（ordering），并且分区数量小于等于spark.shuffle.sort.bypassMergeThreshold（默认200）时
+- 机制
+  - 它会在 Write 阶段退化成类似 Hash Shuffle 的方式，为每个分区先创建一个临时文件，最后再将所有这些文件合并成一个文件并生成索引
+  - 它省去了排序的开销，但最终输出的文件结构和普通的 Sort Shuffle 一样（一个数据文件+一个索引文件），因此避免了 Hash Shuffle 的小文件问题
+
+这是一种在特定条件下（分区数少且无需聚合）兼顾性能和减少小文件的策略
+
 ## Spark Core
 
 详细参考官方手册
@@ -811,6 +889,129 @@ graph TD
 
 从Spark的发展趋势来看，DataFrame/Dataset API是未来的核心，所有的新特性和优化都会优先集中在这里。  
 RDD作为底层基础仍然重要，但大多数用户应该在其之上更高级的抽象进行开发。
+
+## Spark 数据倾斜优化
+
+### 核心思路
+
+由宏观到微观，从 Spark 执行层定位回 Hive 代码层
+
+整个排查路径可以概括为：
+
+1. **通过 Spark UI 定位发生倾斜的 Stage 和 Task** -> 这是物理执行层面
+2. **通过 Stage 对应的 DAG 图和信息，关联回 Hive SQL 中的特定操作** -> 这是逻辑计划层面
+3. **分析该操作涉及的 Hive 代码（表、字段、Join/Group by 条件等）** -> 找到问题根源
+
+### 第一步：识别倾斜现象并定位到 Spark Stage
+
+当作业运行异常缓慢时，首先打开 Spark Web UI (通常端口是 8080 或 4040)
+
+1. 查看 Stages 页面
+
+    - 寻找执行时间明显过长的 Stage
+    - 查看该 Stage 的 Summary Metrics，重点关注：
+      - Input Size / Records： 某个 Task 的输入数据量远大于其他 Task
+      - Shuffle Write Size / Records： 某个 Task 写出的 Shuffle 数据量（Spill 到磁盘的数据）异常大
+      - Duration： 某个 Task 的运行时间是其他 Task 的数倍甚至数十倍
+    - Spark UI 甚至会直接标记出可能存在数据倾斜的 Stage（提示 “Data Skew”）
+
+2. 分析失败的 Task
+
+    - 数据倾斜严重的 Task 可能因为内存溢出（OOM）而失败，导致整个 Stage 不断重试
+    - 在 Stages 或 Executors 页面的 Stderr 日志中常能看到 `java.lang.OutOfMemoryError` 错误
+
+至此，你已经确定了倾斜发生在哪个 Spark Stage
+
+### 第二步：从 Spark Stage 反推 Hive 代码
+
+这是最关键的一步。你需要理解这个 Stage 对应的是 Hive SQL 中的哪个操作
+
+1. 查看 DAG Visualization
+
+    - 在 Spark UI 的对应 Job 页面，有 DAG Visualization（有向无环图可视化）
+    - 图中会清晰显示整个作业的流程，例如：scan -> filter -> exchange (shuffle) -> hashaggregate -> exchange -> hashjoin -> ...
+    - 你找到的那个慢速 Stage，在 DAG 中通常是一个需要 Shuffle 的操作。在 Spark 中，Shuffle 是数据倾斜的“高发区”
+
+2. 关联 Shuffle 操作与 Hive 代码
+
+    - Exchange (Shuffle) 操作通常是为了对数据进行重新分区，以满足后续操作的要求
+    - 它对应 Hive SQL 中需要 Redistribute 数据 的语句：
+      - `JOIN` 操作
+        - 特别是 `Shuffle Hash Join` 或 `SortMerge Join`。Spark 需要将相同 Join Key 的数据拉取到同一个 Executor 上
+        - 这是数据倾斜最常见的地方。Stage 通常对应 `join` 前的最后一个 `exchange`
+      - `GROUP BY` 操作
+        - 需要将相同的 Key 分到一起进行聚合
+        - Stage 对应 `aggregate` 前的 `exchange`
+      - `DISTINCT` 操作
+        - 底层通常被转换为 `GROUP BY`
+      - `Window Functions` (如 `ROW_NUMBER()`, `RANK()`)
+        - 带有 `PARTITION BY` 子句时，也需要按分区键进行 Shuffle
+      - `ORDER BY ... SORT BY`
+        - 全局排序需要进行 Shuffle
+
+3. 精确定位 Hive 代码段
+
+    - 现在你已经知道是 `JOIN` 还是 `GROUP BY` 导致了倾斜
+    - 如果倾斜 Stage 对应 Join，那么问题就出在 `ON` 后面的 Join Key 上
+      - 检查是哪个表（通常是大表）的哪个 Key 存在大量重复值（如 `null`、空字符串 `''`、或某个特定的无效默认值如 `0`， `-1`）
+    - 如果倾斜 Stage 对应 Group By，那么问题就出在 GROUP BY 后面的 分组字段 上
+      - 检查是否存在大量重复的无效值
+
+### 第三步：使用 Hive/Spark 内置功能辅助诊断
+
+1. Skew Join 参数（事后补救，但也是一种验证）：
+
+    - 你可以尝试设置 Spark 的 Skew Join 参数来让作业跑通，这同时也验证了确实是 Join 倾斜
+
+    ```sql
+    SET spark.sql.adaptive.skewJoin.enabled=true;
+    SET spark.sql.adaptive.skewJoin.skewedPartitionFactor=5; -- 倾斜因子
+    SET spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes=100MB; -- 倾斜阈值
+    ```
+
+    - 如果设置这些参数后作业运行时间大幅减少，那么几乎可以 100% 确定是 Join 倾斜
+
+2. 采样分析数据本身：
+
+    - 直接查询疑似存在倾斜 Key 的分布情况
+
+    ```sql
+    -- 检查 Join Key 或 Group By Key 的数据分布
+    SELECT your_join_key, COUNT(1) AS cnt
+    FROM your_table
+    GROUP BY your_join_key
+    ORDER BY cnt DESC
+    LIMIT 100;
+    ```
+
+    - 执行 SQL，如果发现前几条记录的 cnt 数量级远远大于其他记录，就找到了倾斜的元凶
+
+### 总结与排查流程图
+
+1. **症状**：作业卡在 99% 或某个阶段，运行极慢，或有 OOM 错误
+2. **工具**：打开 Spark Web UI
+3. **定位**：在 Stages 页找到 Input/Shuffle Write 量最大、Duration 最长的那个 Task 所在的 Stage
+4. **反推**：查看该 Stage 的 DAG，确定是 `Join`、`Group By` 还是其他 Shuffle 操作
+5. **归因**：回到 Hive SQL，检查对应操作所使用的 Key：
+    - `JOIN` -> `ON` 条件的字段
+    - `GROUP BY` -> `GROUP BY` 后面的字段
+    - `DISTINCT` -> 去重的字段
+    - `Window Function` -> `PARTITION BY` 的字段
+6. **验证**：
+    - 通过 `SELECT ... GROUP BY key ORDER BY COUNT(*) DESC LIMIT 10;` 分析数据分布
+    - 尝试设置 `skewJoin` 参数看是否改善
+
+示例：  
+假设你的 SQL 是：
+
+```sql
+SELECT a.*, b.name
+FROM big_table_a a
+JOIN small_table_b b ON a.item_id = b.id
+GROUP BY a.user_id;
+```
+
+如果在 Spark UI 中发现一个 Stage 在 Join 前发生倾斜，那么问题极有可能出在 a.item_id 上（比如 item_id 为 null 的记录有上亿条）。如果发现是在 Group By 前发生倾斜，那么问题出在 a.user_id 上（可能存在某个“僵尸用户”或“测试用户”产生了海量记录）。
 
 ***
 ![Static Badge](https://img.shields.io/badge/TO_BE-COUTINUE-yellow)
